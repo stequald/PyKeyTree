@@ -745,7 +745,7 @@ SEED_VALUE = "seed_value"
 EXTENDEDKEY_VALUE = "extkey_value"
 CHAIN_VALUE = "chain_value"
 SEED = "-seed"
-SEED_HEX = "-seed.hex"
+SEED_HEX = "-seedhex"
 EXTENDEDKEY = "-extkey"
 CHAIN = "-chain"
 TREE_TRAVERSAL_OPTION = "-traverse"
@@ -755,9 +755,7 @@ TREE_TRAVERSAL_TYPE_LEVELORDER = "levelorder"
 OUTPUT_ENTIRE_CHAIN_OPTION = "-all"
 VERBOSE_OPTION = "-verbose"
 SEED_SHORT = "s"
-SEED_SHORT_HEX_SHORT = "s.h"
-SEED_HEX_SHORT = "seed.h"
-SEED_SHORT_HEX = "s.hex"
+SEED_HEX_SHORT = "sh"
 EXTENDEDKEY_SHORT = "ek"
 CHAIN_SHORT = "c"
 TREE_TRAVERSAL_OPTION_SHORT = "trav"
@@ -1066,7 +1064,7 @@ def parse_arguments(argv):
             if getOptionValue(argsDict.get(NO_PROMPT)):
                 it += 1
                 argsDict[SEED_VALUE] = argv[it]
-        elif arg == SEED_HEX or arg == SEED_HEX_SHORT or arg == SEED_SHORT_HEX or arg == SEED_SHORT_HEX_SHORT:
+        elif arg == SEED_HEX or arg == SEED_HEX_SHORT:
             argsDict[SEED_FORMAT] = "hex"
             argsDict[SEED] = "Y"
             if getOptionValue(argsDict.get(NO_PROMPT)):
