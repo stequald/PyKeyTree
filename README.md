@@ -15,11 +15,11 @@ Extended Keys can be in hex or base58. Seed can be in ASCII or hex. Examples bel
     0'/0
 
 ###### Use the hex option to enter the seed in hex:
-    ./kt.py --seed.hex 
+    ./kt.py --seedhex 
     Enter Seed in Hex:
-    8242faa63e248569c0dea6a5d3e95534587343122ce1bb21882fe743f8e8dc25
+    5e8fc96380121030d090dc2242c4c4159235cdb9fb027e2fa27cdcf0f7216129
     Enter Chain:
-    0'/0
+    0'/1/2
   
 ###### Use the extended key option to enter the extended key in lieu of the seed:
     ./kt.py --extkey 
@@ -38,7 +38,7 @@ Extended Keys can be in hex or base58. Seed can be in ASCII or hex. Examples bel
 
 ###### It is also possible to output the nodes in a different order:
     ./kt.py --traverse levelorder
-    ./kt.py -s.h -trav postorder
+    ./kt.py -sh -trav postorder
     ./kt.py -ek -trav preorder
 
 ###### For more information on nodes use the verbose option:
