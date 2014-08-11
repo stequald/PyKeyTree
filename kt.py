@@ -1410,7 +1410,12 @@ def outputExtKeysFromSeed(seed, chainStr, seedStringFormat, roundsToHash, option
         traversePreorder(keyNodeSeed, treeChains, KeyTreeUtil.MASTER_NODE_LOWERCASE_M, optionsDict)
 
 def outputExtKeysFromExtKey(extKey, chainStr, optionsDict, traverseType = DEFAULTTREETRAVERSALTYPE):
-    keyNode = KeyNode(extkey = DecodeBase58Check(extKey))
+    keyNode = None
+    try:
+        int(extKey, 16)
+        keyNode = KeyNode(extkey = extKey.decode('hex'))
+    except ValueError:
+        keyNode = KeyNode(extkey = DecodeBase58Check(extKey))
 
     treeChains = KeyTreeUtil.parseChainString(chainStr)
 
