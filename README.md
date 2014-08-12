@@ -1,7 +1,7 @@
 PyKeyTree
 ===========
 
-PyKeyTree is a python implementation of [KeyTree](https://github.com/stequald/KeyTree).
+PyKeyTree is a python implementation of [KeyTree](https://github.com/stequald/KeyTree). PyKeyTree requires the python ecdsa module. You can install it by doing `pip install ecdsa`.
 
 #### How to use:
 
@@ -17,7 +17,7 @@ Extended Keys can be in hex or base58. Seed can be in ASCII or hex. Examples bel
 ###### Use the hex option to enter the seed in hex:
     ./kt.py --seedhex 
     Enter Seed in Hex:
-    5e8fc96380121030d090dc2242c4c4159235cdb9fb027e2fa27cdcf0f7216129
+    ddd12befb8df29fb082213ddb7c0f335b95950f9a8dd263ffd21d82bad59a990
     Enter Chain:
     0'/1/2
   
@@ -32,16 +32,16 @@ Extended Keys can be in hex or base58. Seed can be in ASCII or hex. Examples bel
     Enter Chain:
     0'/(3-6)'/(1-2)/8
 
-###### To output all the node data on the chain, use the all option:
+###### To print data on all the nodes in the chain, use the all option:
     ./kt.py --all
     ./kt.py -a
 
-###### It is also possible to output the nodes in a different order:
+###### It is also possible to print data on the nodes in a different order:
     ./kt.py --traverse levelorder
     ./kt.py -sh -trav postorder
     ./kt.py -ek -trav preorder
 
-###### For more information on nodes use the verbose option:
+###### For more information on each node use the verbose option:
     ./kt.py --verbose
     ./kt.py -v
 
