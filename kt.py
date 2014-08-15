@@ -734,6 +734,8 @@ shasum -a 256 kt.py
 noInputEcho = False
 NO_INPUT_ECHO = "-noecho"
 NO_INPUT_ECHO_SHORT = "ne"
+TESTNET = "-testnet"
+TESTNET_SHORT = "tn"
 HASH_SEED = "-hashseed"
 HASH_SEED_SHORT = "hs"
 NO_PROMPT = "-noprompt"
@@ -880,6 +882,7 @@ class KeyTreeUtil(object):
 class KeyNode(object):
     priv_version_ = 0x0488ADE4
     pub_version_ = 0x0488B21E
+    addr_type_ = 0
 
     def __init__(self, key = None, chain_code = None, extkey = None, child_num = 0, parent_fp = 0, depth = 0):
         self.version_ = None
@@ -1012,7 +1015,7 @@ class KeyNode(object):
         return child
 
     def getPrivKey(self, compressed):
-        return SecretToASecret(self.key_[1:], compressed)
+        return SecretToASecret(self.key_[1:], compressed, KeyNode.addr_type_)
 
     def getPubKey(self, compressed):
         if compressed:
@@ -1022,9 +1025,9 @@ class KeyNode(object):
 
     def getAddress(self, compressed):
         if compressed:
-            return hash_160_to_bc_address(hash_160(self.pubkey_compressed_))
+            return hash_160_to_bc_address(hash_160(self.pubkey_compressed_), KeyNode.addr_type_)
         else:
-            return hash_160_to_bc_address(hash_160('\04' + self.pubkey_))
+            return hash_160_to_bc_address(hash_160('\04' + self.pubkey_), KeyNode.addr_type_)
 
     def getExtKey(self):
         depthBytes = format(self.depth_, '#04x')[2:].decode('hex')
@@ -1033,6 +1036,16 @@ class KeyNode(object):
         extkey = versionBytes+depthBytes+self.parent_fp_+childNumBytes+self.chain_code_+self.key_
         return EncodeBase58Check(extkey)
 
+    @staticmethod
+    def setTestNet(enabled):
+        if enabled:
+            KeyNode.priv_version_ = 0x04358394
+            KeyNode.pub_version_ = 0x043587CF
+            KeyNode.addr_type_ = 111
+        else:
+            KeyNode.priv_version_ = 0x0488ADE4
+            KeyNode.pub_version_ = 0x0488B21E
+            KeyNode.addr_type_ = 0
 
 
 def testVector1():
@@ -1091,6 +1104,8 @@ def parse_arguments(argv):
         elif arg == NO_INPUT_ECHO or arg == NO_INPUT_ECHO_SHORT:
             global noInputEcho
             noInputEcho = True
+        elif arg == TESTNET or arg == TESTNET_SHORT:
+            argsDict[TESTNET] = "Y"
         elif arg == HASH_SEED or arg == HASH_SEED_SHORT:
             argsDict[HASH_SEED] = "Y"
             
@@ -1202,6 +1217,7 @@ def enter_prompt(argsDict):
                 roundsToHash = int(roundsToHashStr)
         
         optionsDict = {}
+        optionsDict[TESTNET] = getOptionValue(argsDict.get(TESTNET))
         optionsDict[OUTPUT_ENTIRE_CHAIN_OPTION] = getOptionValue(argsDict.get(OUTPUT_ENTIRE_CHAIN_OPTION))
         optionsDict[VERBOSE_OPTION] = getOptionValue(argsDict.get(VERBOSE_OPTION))
         traverseType = getTreeTraversalOption(argsDict.get(TREE_TRAVERSAL_OPTION))
@@ -1212,6 +1228,7 @@ def enter_prompt(argsDict):
         chain = get_input("Enter Chain:")
         
         optionsDict = {}
+        optionsDict[TESTNET] = getOptionValue(argsDict.get(TESTNET))
         optionsDict[OUTPUT_ENTIRE_CHAIN_OPTION] = getOptionValue(argsDict.get(OUTPUT_ENTIRE_CHAIN_OPTION))
         optionsDict[VERBOSE_OPTION] = getOptionValue(argsDict.get(VERBOSE_OPTION))
         traverseType = getTreeTraversalOption(argsDict.get(TREE_TRAVERSAL_OPTION))
@@ -1247,6 +1264,7 @@ def handle_arguments(argsDict):
             roundsToHash = int(roundsToHashStr)
         
         optionsDict = {}
+        optionsDict[TESTNET] = getOptionValue(argsDict.get(TESTNET))
         optionsDict[OUTPUT_ENTIRE_CHAIN_OPTION] = getOptionValue(argsDict.get(OUTPUT_ENTIRE_CHAIN_OPTION))
         optionsDict[VERBOSE_OPTION] = getOptionValue(argsDict.get(VERBOSE_OPTION))
         traverseType = getTreeTraversalOption(argsDict.get(TREE_TRAVERSAL_OPTION))
@@ -1257,6 +1275,7 @@ def handle_arguments(argsDict):
         chain = argsDict.get(CHAIN_VALUE)
         
         optionsDict = {}
+        optionsDict[TESTNET] = getOptionValue(argsDict.get(TESTNET))
         optionsDict[OUTPUT_ENTIRE_CHAIN_OPTION] = getOptionValue(argsDict.get(OUTPUT_ENTIRE_CHAIN_OPTION))
         optionsDict[VERBOSE_OPTION] = getOptionValue(argsDict.get(VERBOSE_OPTION))
         traverseType = getTreeTraversalOption(argsDict.get(TREE_TRAVERSAL_OPTION))
@@ -1392,6 +1411,11 @@ def outputExtKeysFromSeed(seed, chainStr, seedStringFormat, roundsToHash, option
     if roundsToHash > 0:
         seedHexStr = KeyTreeUtil.sha256Rounds(seedHexStr.decode('hex') , roundsToHash).encode('hex')
 
+    if optionsDict.get(TESTNET) == False:
+        KeyNode.setTestNet(False)
+    else:
+        KeyNode.setTestNet(True)
+
     master_secret, master_chain, master_public_key, master_public_key_compressed = bip32_init(seedHexStr)
     k = master_secret
     c = master_chain
@@ -1410,6 +1434,11 @@ def outputExtKeysFromSeed(seed, chainStr, seedStringFormat, roundsToHash, option
         traversePreorder(keyNodeSeed, treeChains, KeyTreeUtil.MASTER_NODE_LOWERCASE_M, optionsDict)
 
 def outputExtKeysFromExtKey(extKey, chainStr, optionsDict, traverseType = DEFAULTTREETRAVERSALTYPE):
+    if optionsDict.get(TESTNET) == False:
+        KeyNode.setTestNet(False)
+    else:
+        KeyNode.setTestNet(True)
+
     keyNode = None
     try:
         int(extKey, 16)
