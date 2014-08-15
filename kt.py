@@ -820,6 +820,11 @@ class KeyTreeUtil(object):
 
     @staticmethod
     def parseChainString(sequence):
+        if sequence == None or sequence == "":
+            treeChains = []
+            treeChains.append([True, [KeyTreeUtil.NODE_IDX_M_FLAG, KeyTreeUtil.NODE_IDX_M_FLAG]])            
+            return treeChains
+
         treeChains = []
         splitChain = sequence.split('/')
 
@@ -1250,15 +1255,17 @@ def handle_arguments(argsDict):
         optionsDict[OUTPUT_ENTIRE_CHAIN_OPTION] = getOptionValue(argsDict.get(OUTPUT_ENTIRE_CHAIN_OPTION))
         optionsDict[VERBOSE_OPTION] = getOptionValue(argsDict.get(VERBOSE_OPTION))
 
-        if argsDict.get(SEED_VALUE) != None and argsDict.get(CHAIN_VALUE) != None:
+        if argsDict.get(SEED_VALUE) != None:
             seed = argsDict.get(SEED_VALUE)
-            chain = argsDict.get(CHAIN_VALUE)
-            
             seed_format = None
             if argsDict.get(SEED_FORMAT) == "hex":
                 seed_format = StringType.HEX
             else:
                 seed_format = StringType.ASCII
+            
+            chain = None
+            if argsDict.get(CHAIN_VALUE) != None:
+                chain = argsDict.get(CHAIN_VALUE)
             
             roundsToHashStr = argsDict.get(HASH_SEED)
             roundsToHash = 0
