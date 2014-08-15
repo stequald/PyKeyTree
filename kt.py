@@ -925,10 +925,16 @@ class KeyNode(object):
         self.child_num = int(self.child_num.encode('hex'), 16)
 
         if self.isPrivate():
+            if self.version != KeyNode.priv_version:
+                raise ValueError("Invalid extended key version.")            
+
             K0, K0_compressed = get_pubkeys_from_secret(self.key[1:])
             self.pubkey = K0
             self.pubkey_compressed = K0_compressed
         else:
+            if self.version != KeyNode.pub_version:
+                raise ValueError("Invalid extended key version.")            
+
             self.pubkey_compressed = self.key
             self.pubkey = KeyTreeUtil.compressedPubKeyToUncompressedPubKey(self.key)
 
