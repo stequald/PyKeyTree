@@ -1276,6 +1276,7 @@ def handle_arguments(argsDict):
     elif argsDict.get(EXTENDEDKEY) != None:
         extkey = argsDict.get(EXTENDEDKEY_VALUE)
         optionsDict = {}
+        optionsDict[TESTNET] = getOptionValue(argsDict.get(TESTNET))
         optionsDict[OUTPUT_ENTIRE_CHAIN_OPTION] = getOptionValue(argsDict.get(OUTPUT_ENTIRE_CHAIN_OPTION))
         optionsDict[VERBOSE_OPTION] = getOptionValue(argsDict.get(VERBOSE_OPTION))
         outputKeyAddressofExtKey(extkey, optionsDict)
@@ -1404,7 +1405,7 @@ def outputExtKeysFromSeed(seed, chainStr, seedStringFormat, roundsToHash, option
     if roundsToHash > 0:
         seedHexStr = KeyTreeUtil.sha256Rounds(seedHexStr.decode('hex') , roundsToHash).encode('hex')
 
-    if optionsDict.get(TESTNET) == False:
+    if optionsDict.get(TESTNET) == None or optionsDict.get(TESTNET) == False:
         KeyNode.setTestNet(False)
     else:
         KeyNode.setTestNet(True)
@@ -1427,7 +1428,7 @@ def outputExtKeysFromSeed(seed, chainStr, seedStringFormat, roundsToHash, option
         traversePreorder(keyNodeSeed, treeChains, KeyTreeUtil.MASTER_NODE_LOWERCASE_M, optionsDict)
 
 def outputExtKeysFromExtKey(extKey, chainStr, optionsDict, traverseType = DEFAULTTREETRAVERSALTYPE):
-    if optionsDict.get(TESTNET) == False:
+    if optionsDict.get(TESTNET) == None or optionsDict.get(TESTNET) == False:
         KeyNode.setTestNet(False)
     else:
         KeyNode.setTestNet(True)
@@ -1437,7 +1438,10 @@ def outputExtKeysFromExtKey(extKey, chainStr, optionsDict, traverseType = DEFAUL
         int(extKey, 16)
         keyNode = KeyNode(extkey = extKey.decode('hex'))
     except ValueError:
-        keyNode = KeyNode(extkey = DecodeBase58Check(extKey))
+        extKeyBytes = DecodeBase58Check(extKey)
+        if not extKeyBytes:
+            raise ValueError('Invalid extended key.')
+        keyNode = KeyNode(extkey = extKeyBytes)
 
     treeChains = KeyTreeUtil.parseChainString(chainStr)
 
@@ -1452,9 +1456,18 @@ def outputExtKeysFromExtKey(extKey, chainStr, optionsDict, traverseType = DEFAUL
         traversePreorder(keyNode, treeChains, KeyTreeUtil.LEAD_CHAIN_PATH, optionsDict)
 
 def outputKeyAddressofExtKey(extKey, optionsDict):
+    if optionsDict.get(TESTNET) == None or optionsDict.get(TESTNET) == False:
+        KeyNode.setTestNet(False)
+    else:
+        KeyNode.setTestNet(True)
+
+    extKeyBytes = DecodeBase58Check(extKey)
+    if not extKeyBytes:
+        raise ValueError('Invalid extended key.')
+
     keyNode = KeyNode(extkey = DecodeBase58Check(extKey))
-    visit(keyNode, KeyTreeUtil.LEAD_CHAIN_PATH, True, optionsDict)
     if optionsDict.get(VERBOSE_OPTION): outputExtraKeyNodeData(keyNode)
+    visit(keyNode, KeyTreeUtil.LEAD_CHAIN_PATH, True, optionsDict)
     outputString("")
 
 def main():
