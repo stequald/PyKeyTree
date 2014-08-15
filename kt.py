@@ -722,13 +722,6 @@ import getpass
  To do it put the noprompt option at the begining.
  ./kt.py --noprompt -s "this is a password" --chain "(0-1)'/(6-8)'" -trav levelorder
  ./kt.py -np --extkey "xprv9uHRZZhk6KAJC1avXpDAp4MDc3sQKNxDiPvvkX8Br5ngLNv1TxvUxt4cV1rGL5hj6KCesnDYUhd7oWgT11eZG7XnxHrnYeSvkzY7d2bhkJ7" -c "(0-1)'/8"
-
-to do sha256sum in terminal
-LINUX:
-sha256sum kt.py
-cat kt.py | sha256sum
-MAC:
-shasum -a 256 kt.py
 """
 
 noInputEcho = False
@@ -880,39 +873,39 @@ class KeyTreeUtil(object):
 
 
 class KeyNode(object):
-    priv_version_ = 0x0488ADE4
-    pub_version_ = 0x0488B21E
-    addr_type_ = 0
+    priv_version = 0x0488ADE4
+    pub_version = 0x0488B21E
+    addr_type = 0
 
     def __init__(self, key = None, chain_code = None, extkey = None, child_num = 0, parent_fp = 0, depth = 0):
-        self.version_ = None
-        self.depth_ = None
-        self.parent_fp_ = None
-        self.child_num_ = None
-        self.chain_code_ = None
-        self.key_ = None
-        self.valid_ = False
-        self.pubkey_ = None
-        self.pubkey_compressed_ = None
+        self.version = None
+        self.depth = None
+        self.parent_fp = None
+        self.child_num = None
+        self.chain_code = None
+        self.key = None
+        self.valid = False
+        self.pubkey = None
+        self.pubkey_compressed = None
 
         if key and chain_code:
-            self.key_ = key
-            self.chain_code_ = chain_code
-            self.child_num_ = child_num
-            self.parent_fp_ = format(parent_fp, '#010x')[2:].decode('hex')
-            self.depth_ = depth
-            self.version_ = KeyNode.priv_version_
-            if self.key_:
-                if len(self.key_) == 32:
-                    self.key_ = '\00'+self.key_
-                elif len(self.key_) != 33:
+            self.key = key
+            self.chain_code = chain_code
+            self.child_num = child_num
+            self.parent_fp = format(parent_fp, '#010x')[2:].decode('hex')
+            self.depth = depth
+            self.version = KeyNode.priv_version
+            if self.key:
+                if len(self.key) == 32:
+                    self.key = '\00'+self.key
+                elif len(self.key) != 33:
                     raise ValueError('Invalid key.')
 
-                K0, K0_compressed = get_pubkeys_from_secret(self.key_[1:])
-                self.pubkey_ = K0
-                self.pubkey_compressed_ = K0_compressed
+                K0, K0_compressed = get_pubkeys_from_secret(self.key[1:])
+                self.pubkey = K0
+                self.pubkey_compressed = K0_compressed
             
-            self.valid_ = True
+            self.valid = True
         elif extkey:
             self.parseExtKey(extkey)
 
@@ -920,132 +913,132 @@ class KeyNode(object):
         if len(extKey) != 78:
             raise ValueError("Invalid extended key length.")
 
-        self.version_ = extKey[0:4]
-        self.depth_ = extKey[4]
-        self.parent_fp_ = extKey[5:9]
-        self.child_num_ = extKey[9:13]
-        self.chain_code_ = extKey[13:45]
-        self.key_ = extKey[45:78]
+        self.version = extKey[0:4]
+        self.depth = extKey[4]
+        self.parent_fp = extKey[5:9]
+        self.child_num = extKey[9:13]
+        self.chain_code = extKey[13:45]
+        self.key = extKey[45:78]
 
-        self.version_ = int(self.version_.encode('hex'), 16)
-        self.depth_ = int(self.depth_.encode('hex'), 16)
-        self.child_num_ = int(self.child_num_.encode('hex'), 16)
+        self.version = int(self.version.encode('hex'), 16)
+        self.depth = int(self.depth.encode('hex'), 16)
+        self.child_num = int(self.child_num.encode('hex'), 16)
 
         if self.isPrivate():
-            K0, K0_compressed = get_pubkeys_from_secret(self.key_[1:])
-            self.pubkey_ = K0
-            self.pubkey_compressed_ = K0_compressed
+            K0, K0_compressed = get_pubkeys_from_secret(self.key[1:])
+            self.pubkey = K0
+            self.pubkey_compressed = K0_compressed
         else:
-            self.pubkey_compressed_ = self.key_
-            self.pubkey_ = KeyTreeUtil.compressedPubKeyToUncompressedPubKey(self.key_)
+            self.pubkey_compressed = self.key
+            self.pubkey = KeyTreeUtil.compressedPubKeyToUncompressedPubKey(self.key)
 
-        self.valid_ = True
+        self.valid = True
 
-    def version(self):
-        return self.version_
+    def getVersion(self):
+        return self.version
 
-    def depth(self):
-        return self.depth_
+    def getDepth(self):
+        return self.depth
 
-    def parent_fp(self):
-        return self.parent_fp_
+    def getParentFingerPrint(self):
+        return self.parent_fp
 
-    def child_num(self):
-        return self.child_num_
+    def getChildNum(self):
+        return self.child_num
 
-    def chain_code(self):
-        return self.chain_code_
+    def getChainCodeBytes(self):
+        return self.chain_code
 
-    def key(self):
-        return self.key_
+    def getKeyBytes(self):
+        return self.key
 
-    def pubkey(self):
-        return self.pubkey_compressed_
-
-    def pubkey_uncompressed(self):
-        return self.pubkey_
+    def getPubKeyBytes(self, compressed):
+        if compressed:
+            return self.pubkey_compressed
+        else:
+            return self.pubkey
 
     def isPrivate(self):
-        return len(self.key_) == 33 and int(self.key_[0].encode('hex'), 16) == 0x00
+        return len(self.key) == 33 and int(self.key[0].encode('hex'), 16) == 0x00
 
-    def fp(self):
-        return hash_160(self.pubkey_compressed_)[:4]
+    def getFingerPrint(self):
+        return hash_160(self.pubkey_compressed)[:4]
 
     def getPublic(self):
-        if not self.valid_:
+        if not self.valid:
             raise Exception('Keychain is invalid.')
 
         pub = KeyNode()
-        pub.valid_ = self.valid_
-        pub.version_ = KeyNode.pub_version_
-        pub.depth_ = self.depth_
-        pub.parent_fp_ = self.parent_fp_
-        pub.child_num_ = self.child_num_
-        pub.chain_code_ = self.chain_code_
-        pub.pubkey_ = self.pubkey_
-        pub.pubkey_compressed_ = self.pubkey_compressed_
-        pub.key_ = self.pubkey_compressed_
+        pub.valid = self.valid
+        pub.version = KeyNode.pub_version
+        pub.depth = self.depth
+        pub.parent_fp = self.parent_fp
+        pub.child_num = self.child_num
+        pub.chain_code = self.chain_code
+        pub.pubkey = self.pubkey
+        pub.pubkey_compressed = self.pubkey_compressed
+        pub.key = self.pubkey_compressed
         return pub
 
     def getChild(self, i):
-        if not self.valid_:
+        if not self.valid:
             raise Exception('Keychain is invalid.')
 
         if not self.isPrivate() and KeyTreeUtil.isPrime(i):
             raise Exception('Cannot do private key derivation on public key.')
 
         child = KeyNode()
-        child.valid_ = False
-        child.version_ = self.version_
-        child.depth_ = self.depth_ + 1
-        child.parent_fp_ = self.fp()
-        child.child_num_ = i
+        child.valid = False
+        child.version = self.version
+        child.depth = self.depth + 1
+        child.parent_fp = self.getFingerPrint()
+        child.child_num = i
 
         if self.isPrivate():
-            child.key_, child.chain_code_ = CKD(self.key_[1:], self.chain_code_, i)
+            child.key, child.chain_code = CKD(self.key[1:], self.chain_code, i)
             # pad with 0's to make it 33 bytes
-            zeroPadding = '\00'*(33 - len(child.key_))
-            child.key_ = zeroPadding + child.key_
-            child.pubkey_, child.pubkey_compressed_ = get_pubkeys_from_secret(child.key_[1:])
+            zeroPadding = '\00'*(33 - len(child.key))
+            child.key = zeroPadding + child.key
+            child.pubkey, child.pubkey_compressed = get_pubkeys_from_secret(child.key[1:])
         else:
-            child.pubkey_, child.pubkey_compressed_, child.chain_code_ = CKD_prime(self.pubkey_, self.chain_code_, i)
-            child.key_ = child.pubkey_compressed_
+            child.pubkey, child.pubkey_compressed, child.chain_code = CKD_prime(self.pubkey, self.chain_code, i)
+            child.key = child.pubkey_compressed
 
-        child.valid_ = True
+        child.valid = True
         return child
 
     def getPrivKey(self, compressed):
-        return SecretToASecret(self.key_[1:], compressed, KeyNode.addr_type_)
+        return SecretToASecret(self.key[1:], compressed, KeyNode.addr_type)
 
     def getPubKey(self, compressed):
         if compressed:
-            return self.pubkey_compressed_.encode('hex')
+            return self.pubkey_compressed.encode('hex')
         else:
-            return ('\04' + self.pubkey_).encode('hex')
+            return ('\04' + self.pubkey).encode('hex')
 
     def getAddress(self, compressed):
         if compressed:
-            return hash_160_to_bc_address(hash_160(self.pubkey_compressed_), KeyNode.addr_type_)
+            return hash_160_to_bc_address(hash_160(self.pubkey_compressed), KeyNode.addr_type)
         else:
-            return hash_160_to_bc_address(hash_160('\04' + self.pubkey_), KeyNode.addr_type_)
+            return hash_160_to_bc_address(hash_160('\04' + self.pubkey), KeyNode.addr_type)
 
     def getExtKey(self):
-        depthBytes = format(self.depth_, '#04x')[2:].decode('hex')
-        childNumBytes = format(self.child_num_, '#010x')[2:].decode('hex')
-        versionBytes = format(self.version_, '#010x')[2:].decode('hex')
-        extkey = versionBytes+depthBytes+self.parent_fp_+childNumBytes+self.chain_code_+self.key_
+        depthBytes = format(self.depth, '#04x')[2:].decode('hex')
+        childNumBytes = format(self.child_num, '#010x')[2:].decode('hex')
+        versionBytes = format(self.version, '#010x')[2:].decode('hex')
+        extkey = versionBytes+depthBytes+self.parent_fp+childNumBytes+self.chain_code+self.key
         return EncodeBase58Check(extkey)
 
     @staticmethod
     def setTestNet(enabled):
         if enabled:
-            KeyNode.priv_version_ = 0x04358394
-            KeyNode.pub_version_ = 0x043587CF
-            KeyNode.addr_type_ = 111
+            KeyNode.priv_version = 0x04358394
+            KeyNode.pub_version = 0x043587CF
+            KeyNode.addr_type = 111
         else:
-            KeyNode.priv_version_ = 0x0488ADE4
-            KeyNode.pub_version_ = 0x0488B21E
-            KeyNode.addr_type_ = 0
+            KeyNode.priv_version = 0x0488ADE4
+            KeyNode.pub_version = 0x0488B21E
+            KeyNode.addr_type = 0
 
 
 def testVector1():
@@ -1392,10 +1385,10 @@ def traverseLevelorder(keyNode, treeChains, chainName, level, keyNodeDeq, levelN
         traverseLevelorder(node, treeChains, cc, level, keyNodeDeq, levelNChainDeq, optionsDict)
 
 def outputExtraKeyNodeData(keyNode):
-    outputString("  * depth:              " + str(keyNode.depth()));
-    outputString("  * child number:       " + KeyTreeUtil.iToString(keyNode.child_num()))
-    outputString("  * parent fingerprint: " + keyNode.parent_fp().encode('hex'))
-    outputString("  * fingerprint:        " + keyNode.fp().encode('hex'))
+    outputString("  * depth:              " + str(keyNode.getDepth()))
+    outputString("  * child number:       " + KeyTreeUtil.iToString(keyNode.getChildNum()))
+    outputString("  * parent fingerprint: " + keyNode.getParentFingerPrint().encode('hex'))
+    outputString("  * fingerprint:        " + keyNode.getFingerPrint().encode('hex'))
 
 def outputExtKeysFromSeed(seed, chainStr, seedStringFormat, roundsToHash, optionsDict, traverseType = DEFAULTTREETRAVERSALTYPE):
     seedHexStr = None
