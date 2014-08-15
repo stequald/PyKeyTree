@@ -1195,46 +1195,43 @@ def get_input(pretext):
 def enter_prompt(argsDict):
     if argsDict.get(HELP) == HELP:
         outputExamples()
-    elif getOptionValue(argsDict.get(SEED)):
-        seed = None
-        seed_format = None
-        if (argsDict.get(SEED_FORMAT) == "hex"):
-            seed_format = StringType.HEX
-            seed = get_input("Enter Seed in Hex:")
-            try: int(seed, 16)
-            except ValueError: raise ValueError("Invalid hex string \"" + seed + "\"")
-        else:
-            seed_format = StringType.ASCII
-            seed = get_input("Enter Seed:")
-        
-        chain = get_input("Enter Chain:")
-        
-        roundsToHash = 0
-        if getOptionValue(argsDict.get(HASH_SEED)):
-            roundsToHashStr = get_input("Enter number of rounds of Sha256 hash:")
-            if roundsToHashStr:
-                roundsToHash = int(roundsToHashStr)
-        
+    else:
         optionsDict = {}
         optionsDict[TESTNET] = getOptionValue(argsDict.get(TESTNET))
         optionsDict[OUTPUT_ENTIRE_CHAIN_OPTION] = getOptionValue(argsDict.get(OUTPUT_ENTIRE_CHAIN_OPTION))
         optionsDict[VERBOSE_OPTION] = getOptionValue(argsDict.get(VERBOSE_OPTION))
         traverseType = getTreeTraversalOption(argsDict.get(TREE_TRAVERSAL_OPTION))
-        outputExtKeysFromSeed(seed, chain, seed_format, roundsToHash, optionsDict, traverseType)
-        
-    elif getOptionValue(argsDict.get(EXTENDEDKEY)):
-        extkey = get_input("Enter Extended Key:")
-        chain = get_input("Enter Chain:")
-        
-        optionsDict = {}
-        optionsDict[TESTNET] = getOptionValue(argsDict.get(TESTNET))
-        optionsDict[OUTPUT_ENTIRE_CHAIN_OPTION] = getOptionValue(argsDict.get(OUTPUT_ENTIRE_CHAIN_OPTION))
-        optionsDict[VERBOSE_OPTION] = getOptionValue(argsDict.get(VERBOSE_OPTION))
-        traverseType = getTreeTraversalOption(argsDict.get(TREE_TRAVERSAL_OPTION))
-        if chain != "":
-            outputExtKeysFromExtKey(extkey, chain, optionsDict, traverseType)
-        else:
-            outputKeyAddressofExtKey(extkey, optionsDict)
+
+        if getOptionValue(argsDict.get(SEED)):
+            seed = None
+            seed_format = None
+            if (argsDict.get(SEED_FORMAT) == "hex"):
+                seed_format = StringType.HEX
+                seed = get_input("Enter Seed in Hex:")
+                try: int(seed, 16)
+                except ValueError: raise ValueError("Invalid hex string \"" + seed + "\"")
+            else:
+                seed_format = StringType.ASCII
+                seed = get_input("Enter Seed:")
+            
+            chain = get_input("Enter Chain:")
+            
+            roundsToHash = 0
+            if getOptionValue(argsDict.get(HASH_SEED)):
+                roundsToHashStr = get_input("Enter number of rounds of Sha256 hash:")
+                if roundsToHashStr:
+                    roundsToHash = int(roundsToHashStr)
+            
+            outputExtKeysFromSeed(seed, chain, seed_format, roundsToHash, optionsDict, traverseType)
+            
+        elif getOptionValue(argsDict.get(EXTENDEDKEY)):
+            extkey = get_input("Enter Extended Key:")
+            chain = get_input("Enter Chain:")
+            
+            if chain != "":
+                outputExtKeysFromExtKey(extkey, chain, optionsDict, traverseType)
+            else:
+                outputKeyAddressofExtKey(extkey, optionsDict)
     
     return 0
 
@@ -1247,47 +1244,41 @@ def handle_arguments(argsDict):
     if argsDict.get(HELP) == HELP:
         outputExamples()
         return 0
-    elif argsDict.get(SEED_VALUE) != None and argsDict.get(CHAIN_VALUE) != None:
-        seed = argsDict.get(SEED_VALUE)
-        chain = argsDict.get(CHAIN_VALUE)
-        
-        seed_format = None
-        if argsDict.get(SEED_FORMAT) == "hex":
-            seed_format = StringType.HEX
-        else:
-            seed_format = StringType.ASCII
-        
-        roundsToHashStr = argsDict.get(HASH_SEED)
-        roundsToHash = 0
-        if roundsToHashStr:
-            roundsToHash = int(roundsToHashStr)
-        
-        optionsDict = {}
-        optionsDict[TESTNET] = getOptionValue(argsDict.get(TESTNET))
-        optionsDict[OUTPUT_ENTIRE_CHAIN_OPTION] = getOptionValue(argsDict.get(OUTPUT_ENTIRE_CHAIN_OPTION))
-        optionsDict[VERBOSE_OPTION] = getOptionValue(argsDict.get(VERBOSE_OPTION))
-        traverseType = getTreeTraversalOption(argsDict.get(TREE_TRAVERSAL_OPTION))
-        optionsDict[HASH_SEED] = getOptionValue(argsDict.get(HASH_SEED))
-        outputExtKeysFromSeed(seed, chain, seed_format, roundsToHash, optionsDict, traverseType)
-    elif argsDict.get(EXTENDEDKEY_VALUE) != None and argsDict.get(CHAIN_VALUE) != None:
-        extkey = argsDict.get(EXTENDEDKEY_VALUE)
-        chain = argsDict.get(CHAIN_VALUE)
-        
-        optionsDict = {}
-        optionsDict[TESTNET] = getOptionValue(argsDict.get(TESTNET))
-        optionsDict[OUTPUT_ENTIRE_CHAIN_OPTION] = getOptionValue(argsDict.get(OUTPUT_ENTIRE_CHAIN_OPTION))
-        optionsDict[VERBOSE_OPTION] = getOptionValue(argsDict.get(VERBOSE_OPTION))
-        traverseType = getTreeTraversalOption(argsDict.get(TREE_TRAVERSAL_OPTION))
-        outputExtKeysFromExtKey(extkey, chain, optionsDict, traverseType)
-    elif argsDict.get(EXTENDEDKEY) != None:
-        extkey = argsDict.get(EXTENDEDKEY_VALUE)
-        optionsDict = {}
-        optionsDict[TESTNET] = getOptionValue(argsDict.get(TESTNET))
-        optionsDict[OUTPUT_ENTIRE_CHAIN_OPTION] = getOptionValue(argsDict.get(OUTPUT_ENTIRE_CHAIN_OPTION))
-        optionsDict[VERBOSE_OPTION] = getOptionValue(argsDict.get(VERBOSE_OPTION))
-        outputKeyAddressofExtKey(extkey, optionsDict)
     else:
-        raise ValueError("Invalid arguments.")
+        optionsDict = {}
+        optionsDict[TESTNET] = getOptionValue(argsDict.get(TESTNET))
+        optionsDict[OUTPUT_ENTIRE_CHAIN_OPTION] = getOptionValue(argsDict.get(OUTPUT_ENTIRE_CHAIN_OPTION))
+        optionsDict[VERBOSE_OPTION] = getOptionValue(argsDict.get(VERBOSE_OPTION))
+
+        if argsDict.get(SEED_VALUE) != None and argsDict.get(CHAIN_VALUE) != None:
+            seed = argsDict.get(SEED_VALUE)
+            chain = argsDict.get(CHAIN_VALUE)
+            
+            seed_format = None
+            if argsDict.get(SEED_FORMAT) == "hex":
+                seed_format = StringType.HEX
+            else:
+                seed_format = StringType.ASCII
+            
+            roundsToHashStr = argsDict.get(HASH_SEED)
+            roundsToHash = 0
+            if roundsToHashStr:
+                roundsToHash = int(roundsToHashStr)
+            
+            traverseType = getTreeTraversalOption(argsDict.get(TREE_TRAVERSAL_OPTION))
+            optionsDict[HASH_SEED] = getOptionValue(argsDict.get(HASH_SEED))
+            outputExtKeysFromSeed(seed, chain, seed_format, roundsToHash, optionsDict, traverseType)
+        elif argsDict.get(EXTENDEDKEY_VALUE) != None and argsDict.get(CHAIN_VALUE) != None:
+            extkey = argsDict.get(EXTENDEDKEY_VALUE)
+            chain = argsDict.get(CHAIN_VALUE)
+            
+            traverseType = getTreeTraversalOption(argsDict.get(TREE_TRAVERSAL_OPTION))
+            outputExtKeysFromExtKey(extkey, chain, optionsDict, traverseType)
+        elif argsDict.get(EXTENDEDKEY) != None:
+            extkey = argsDict.get(EXTENDEDKEY_VALUE)
+            outputKeyAddressofExtKey(extkey, optionsDict)
+        else:
+            raise ValueError("Invalid arguments.")
 
     return 0
 
