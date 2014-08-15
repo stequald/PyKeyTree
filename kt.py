@@ -874,7 +874,7 @@ class KeyTreeUtil(object):
             y = -y % p
 
         ppp = KeyTreeUtil.powMod(x, 3, p)
-        uncompressedPubKey = '{:x}{:x}'.format(x, y)
+        uncompressedPubKey = '{:064x}{:064x}'.format(x, y)
         return uncompressedPubKey.decode('hex')
 
 
