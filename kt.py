@@ -1274,7 +1274,7 @@ def handle_arguments(argsDict):
         traverseType = getTreeTraversalOption(argsDict.get(TREE_TRAVERSAL_OPTION))
         outputExtKeysFromExtKey(extkey, chain, optionsDict, traverseType)
     elif argsDict.get(EXTENDEDKEY) != None:
-        extkey = argsDict.get(EXTENDEDKEY)
+        extkey = argsDict.get(EXTENDEDKEY_VALUE)
         optionsDict = {}
         optionsDict[OUTPUT_ENTIRE_CHAIN_OPTION] = getOptionValue(argsDict.get(OUTPUT_ENTIRE_CHAIN_OPTION))
         optionsDict[VERBOSE_OPTION] = getOptionValue(argsDict.get(VERBOSE_OPTION))
