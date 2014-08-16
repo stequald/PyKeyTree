@@ -1440,7 +1440,9 @@ def outputExtKeysFromSeed(seed, chainStr, seedStringFormat, roundsToHash, option
     keyNodeSeed = KeyNode(key = k, chain_code = c)
 
     treeChains = KeyTreeUtil.parseChainString(chainStr)
-    outputString("Master (hex): " + seedHexStr)
+
+    if optionsDict.get(VERBOSE_OPTION):
+        outputString("Master (hex): " + seedHexStr)
 
     if traverseType == TreeTraversal.POSTORDER:
         traversePostorder(keyNodeSeed, treeChains, KeyTreeUtil.MASTER_NODE_LOWERCASE_M, optionsDict)
