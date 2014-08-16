@@ -725,20 +725,18 @@ import getpass
 """
 
 noInputEcho = False
-NO_INPUT_ECHO = "-noecho"
-NO_INPUT_ECHO_SHORT = "ne"
-TESTNET = "-testnet"
-TESTNET_SHORT = "tn"
-HASH_SEED = "-hashseed"
-HASH_SEED_SHORT = "hs"
-NO_PROMPT = "-noprompt"
-NO_PROMPT_SHORT = "np"
+
 cmdName = "./kt"
 HELP = "-help"
 SEED_FORMAT = "seed_format"
 SEED_VALUE = "seed_value"
 EXTENDEDKEY_VALUE = "extkey_value"
 CHAIN_VALUE = "chain_value"
+
+NO_INPUT_ECHO = "-noecho"
+TESTNET = "-testnet"
+HASH_SEED = "-hashseed"
+NO_PROMPT = "-noprompt"
 SEED = "-seed"
 SEED_HEX = "-seedhex"
 EXTENDEDKEY = "-extkey"
@@ -749,6 +747,11 @@ TREE_TRAVERSAL_TYPE_POSTORDER = "postorder"
 TREE_TRAVERSAL_TYPE_LEVELORDER = "levelorder"
 OUTPUT_ENTIRE_CHAIN_OPTION = "-all"
 VERBOSE_OPTION = "-verbose"
+
+NO_INPUT_ECHO_SHORT = "ne"
+TESTNET_SHORT = "tn"
+HASH_SEED_SHORT = "hs"
+NO_PROMPT_SHORT = "np"
 SEED_SHORT = "s"
 SEED_HEX_SHORT = "sh"
 EXTENDEDKEY_SHORT = "ek"
@@ -1146,7 +1149,7 @@ def outputExamples():
     outputString("Enter Seed in Hex:")
     outputString("000102030405060708090a0b0c0d0e0f")
     outputString("Enter Chain:")
-    outputString("0'/0")
+    outputString("0'/1/2")
     outputString("")
     
     outputString("Use the extended key option to enter the extended key in lieu of the seed:")
@@ -1172,10 +1175,26 @@ def outputExamples():
     outputString(cmdName+" -trav postorder")
     outputString(cmdName+" -trav preorder")
     outputString("")
-    
+
     outputString("For more information on the node use the verbose option:")
     outputString(cmdName+" --verbose")
     outputString(cmdName+" -v")
+    outputString("")
+    
+    outputString("There is also the testnet option:")
+    outputString(cmdName+" --testnet")
+    outputString(cmdName+" -tn")
+    outputString("")
+
+    outputString("Use the no echo option to not echo your inputs:")
+    outputString(cmdName+" --noecho")
+    outputString(cmdName+" -ne")
+    outputString("")
+
+    outputString("Use the hash seed option to do a number of specific rounds of sha256 on your seed:")
+    outputString(cmdName+" --hashseed 10")
+    outputString(cmdName+" -hs 5")
+    outputString("")
 
 def getTreeTraversalOption(treeTraversalOption):
     if treeTraversalOption == TREE_TRAVERSAL_TYPE_LEVELORDER or treeTraversalOption == TREE_TRAVERSAL_TYPE_LEVELORDER_SHORT:
