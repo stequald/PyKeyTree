@@ -14,6 +14,13 @@ The input seed is coverted to hex before it used as the master seed, or you can 
     Enter Chain:
     0'/0
 
+###### Use the BIP39 option to check if the seed/mnemonic conforms to bip39 rules:
+    ./kt.py --bip39
+    Enter Seed:
+    pilot dolphin motion portion survey sock turkey afford destroy knee sock sibling
+    Enter Chain:
+    0'/0
+
 ###### Use the hex option to enter the seed in hex:
     ./kt.py --seedhex 
     Enter Seed in Hex:
@@ -21,6 +28,19 @@ The input seed is coverted to hex before it used as the master seed, or you can 
     Enter Chain:
     0'/1/2
   
+###### Use the hash seed option to do a number of specific rounds of sha256 on your seed. If the bip39 option is used hash seed option will be ignored:
+    ./kt.py --seedhex --hashseed
+    Enter Seed in Hex:
+    7b1f95ed9a1c9319172c2dd4cc765fb82bad1a3be1cfc89fc37006c0dbbcbe3d
+    Enter Chain:
+    0'/1/2
+    Enter number of rounds of Sha256 hash:
+    2
+
+###### Use the generate BIP39 mnemonic option to generate a mnemonic using os.urandom:
+    ./kt.py --generateBIP39mnemonic
+    ./kt.py -gbip39m
+
 ###### Use the extended key option to enter the extended key in lieu of the seed:
     ./kt.py --extkey 
     ./kt.py -ek 
@@ -52,6 +72,14 @@ The input seed is coverted to hex before it used as the master seed, or you can 
 ###### Use the no echo option to not echo your inputs:
     ./kt.py --noecho
     ./kt.py -ne
+
+###### You can specify all options at once with the no prompt option. But it is discouraged because on most OS commands are stored in a history file:
+    ./kt.py --noprompt -s "this is a password" --chain "(0-1)'/(6-8)'" -trav levelorder
+    ./kt.py -np -s "this is a password" -c "(0-1)'/(6-8)'" -hs 3 -v
+    ./kt.py -np --extkey xprv9uHRZZhk6KAJC1avXpDAp4MDc3sQKNxDiPvvkX8Br5ngLNv1TxvUxt4cV1rGL5hj6KCesnDYUhd7oWgT11eZG7XnxHrnYeSvkzY7d2bhkJ7 -c "(0-1)'/8"
+    ./kt.py -np --b39 -s "pilot dolphin motion portion survey sock turkey afford destroy knee sock sibling" -c "44'/0'/(0-1)'"
+    ./kt.py -np -sh 936ae011512b96e7ce3ff05d464e3801834d023249baabfebfe13e593dc33610ea68279c271df6bab7cfbea8bbcf470e050fe6589f552f7e1f6c80432c7bcc57 -c "44'/0'/(0-1)'"
+
 
 ##### For more information on how to use KeyTree do:
     ./kt.py --help
