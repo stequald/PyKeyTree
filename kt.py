@@ -2050,6 +2050,14 @@ WORD_LIST = [
   "zoo"
 ]
 
+import sys
+if sys.version_info.major == 2:
+  def safe_from_hex(s):
+    return s.decode('hex')
+else:
+  def safe_from_hex(s):
+    return bytes.fromhex(s)
+
 # from http://eli.thegreenplace.net/2009/03/07/computing-modular-square-roots-in-python/
 
 def modular_sqrt(a, p):
@@ -2155,7 +2163,7 @@ import os, unicodedata
 import unittest
 
 def rev_hex(s):
-    return s.decode('hex')[::-1].encode('hex')
+    return safe_from_hex(s)[::-1].encode('hex')
 
 def int_to_hex(i, length=1):
     s = hex(i)[2:].rstrip('L')
@@ -2206,7 +2214,7 @@ def i2d_ECPrivateKey(pkey, compressed=False):
               '%064x' % _r + \
               '020101a144034200'
         
-    return key.decode('hex') + i2o_ECPublicKey(pkey.pubkey, compressed)
+    return safe_from_hex(key) + i2o_ECPublicKey(pkey.pubkey, compressed)
     
 def i2o_ECPublicKey(pubkey, compressed=False):
     # public keys are 65 bytes long (520 bits)
@@ -2223,7 +2231,7 @@ def i2o_ECPublicKey(pubkey, compressed=False):
               '%064x' % pubkey.point.x() + \
               '%064x' % pubkey.point.y()
             
-    return key.decode('hex')
+    return safe_from_hex(key)
             
 # end pywallet openssl private key implementation
 
@@ -2352,7 +2360,7 @@ def GetPrivKey(pkey, compressed=False):
     return i2d_ECPrivateKey(pkey, compressed)
 
 def GetSecret(pkey):
-    return ('%064x' % pkey.secret).decode('hex')
+    return safe_from_hex(('%064x' % pkey.secret))
 
 def is_compressed(sec):
     b = ASecretToSecret(sec)
@@ -2370,7 +2378,7 @@ def public_key_from_private_key(sec):
 
 def address_from_private_key(sec):
     public_key = public_key_from_private_key(sec)
-    address = public_key_to_bc_address(public_key.decode('hex'))
+    address = public_key_to_bc_address(safe_from_hex(public_key))
     return address
 
 
@@ -2407,12 +2415,12 @@ def verify_message(address, signature, message):
         EC_KEY.verify_message(address, signature, message)
         return True
     except Exception as e:
-        print "error: Verification error: {0}".format(e)
+        print("error: Verification error: {0}".format(e))
         return False
 
 
 def encrypt_message(message, pubkey):
-    return EC_KEY.encrypt_message(message, pubkey.decode('hex'))
+    return EC_KEY.encrypt_message(message, safe_from_hex(pubkey))
 
 
 def chunks(l, n):
@@ -2438,16 +2446,16 @@ def private_header(msg,v):
     assert v<1, "Can't write version %d private header"%v
     r = ''
     if v==0:
-        r += ('%08x'%len(msg)).decode('hex')
+        r += safe_from_hex(('%08x'%len(msg)))
         r += sha256(msg)[:2]
-    return ('%02x'%v).decode('hex') + ('%04x'%len(r)).decode('hex') + r
+    return safe_from_hex(('%02x'%v)) + safe_from_hex(('%04x'%len(r))) + r
 
 def public_header(pubkey,v):
     assert v<1, "Can't write version %d public header"%v
     r = ''
     if v==0:
         r = sha256(pubkey)[:2]
-    return '\x6a\x6a' + ('%02x'%v).decode('hex') + ('%04x'%len(r)).decode('hex') + r
+    return '\x6a\x6a' + safe_from_hex(('%02x'%v)) + safe_from_hex(('%04x'%len(r))) + r
 
 
 def negative_point(P):
@@ -2456,8 +2464,8 @@ def negative_point(P):
 
 def point_to_ser(P, comp=True ):
     if comp:
-        return ( ('%02x'%(2+(P.y()&1)))+('%064x'%P.x()) ).decode('hex')
-    return ( '04'+('%064x'%P.x())+('%064x'%P.y()) ).decode('hex')
+        return safe_from_hex(( ('%02x'%(2+(P.y()&1)))+('%064x'%P.x()) ))
+    return safe_from_hex(( '04'+('%064x'%P.x())+('%064x'%P.y()) ))
 
 
 def ser_to_point(Aser):
@@ -2606,7 +2614,7 @@ class EC_KEY(object):
             U = ser_to_point(User)
             V = T*pvk
             Mcalc = U + negative_point(V)
-            r += ('%064x'%(Mcalc.x()-xoffset)).decode('hex')
+            r += safe_from_hex(('%064x'%(Mcalc.x()-xoffset)))
 
         pvhv = str_to_long(r[0])
         assert pvhv==0, "Can't read version %d private header"%pvhv
@@ -2669,10 +2677,10 @@ def CKD(k, c, n):
     K = GetPubKey(keypair.pubkey,True)
 
     if n & BIP32_PRIME: # We want to make a "secret" address that can't be determined from K
-        data = chr(0) + k + rev_hex(int_to_hex(n,4)).decode('hex')
+        data = chr(0) + k + safe_from_hex(rev_hex(int_to_hex(n,4)))
         I = hmac.new(c, data, hashlib.sha512).digest()
     else: # We want a "non-secret" address that can be determined from K
-        I = hmac.new(c, K + rev_hex(int_to_hex(n,4)).decode('hex'), hashlib.sha512).digest()
+        I = hmac.new(c, K + safe_from_hex(rev_hex(int_to_hex(n,4))), hashlib.sha512).digest()
         
     k_n = number_to_string( (string_to_number(I[0:32]) + string_to_number(k)) % order , order )
     c_n = I[32:]
@@ -2694,7 +2702,7 @@ def CKD_prime(K, c, n):
     K_public_key = ecdsa.VerifyingKey.from_string( K, curve = SECP256k1 )
     K_compressed = GetPubKey(K_public_key.pubkey,True)
 
-    I = hmac.new(c, K_compressed + rev_hex(int_to_hex(n,4)).decode('hex'), hashlib.sha512).digest()
+    I = hmac.new(c, K_compressed + safe_from_hex(rev_hex(int_to_hex(n,4))), hashlib.sha512).digest()
 
     curve = SECP256k1
     pubkey_point = string_to_number(I[0:32])*curve.generator + K_public_key.pubkey.point
@@ -2937,7 +2945,7 @@ class KeyTreeUtil(object):
 
         ppp = KeyTreeUtil.powMod(x, 3, p)
         uncompressedPubKey = '{:064x}{:064x}'.format(x, y)
-        return uncompressedPubKey.decode('hex')
+        return safe_from_hex(uncompressedPubKey)
 
 
 
@@ -3037,12 +3045,12 @@ class KeyNode(object):
             self.key = key
             self.chain_code = chain_code
             self.child_num = child_num
-            self.parent_fp = format(parent_fp, '#010x')[2:].decode('hex')
+            self.parent_fp = safe_from_hex(format(parent_fp, '#010x')[2:])
             self.depth = depth
             self.version = KeyNode.priv_version
             if self.key:
                 if len(self.key) == 32:
-                    self.key = '\00'+self.key
+                    self.key = b'\00'+self.key
                 elif len(self.key) != 33:
                     raise ValueError('Invalid key.')
 
@@ -3174,9 +3182,9 @@ class KeyNode(object):
             return hash_160_to_bc_address(hash_160('\04' + self.pubkey), KeyNode.addr_type)
 
     def getExtKey(self):
-        depthBytes = format(self.depth, '#04x')[2:].decode('hex')
-        childNumBytes = format(self.child_num, '#010x')[2:].decode('hex')
-        versionBytes = format(self.version, '#010x')[2:].decode('hex')
+        depthBytes = safe_from_hex(format(self.depth, '#04x')[2:])
+        childNumBytes = safe_from_hex(format(self.child_num, '#010x')[2:])
+        versionBytes = safe_from_hex(format(self.version, '#010x')[2:])
         extkey = versionBytes+depthBytes+self.parent_fp+childNumBytes+self.chain_code+self.key
         return EncodeBase58Check(extkey)
 
@@ -3863,7 +3871,7 @@ def outputExtKeysFromSeed(seed, chainStr, seedStringFormat, roundsToHash, option
             raise ValueError("Invalid seed string format.")
 
         if roundsToHash > 0:
-            seedHexStr = KeyTreeUtil.sha256Rounds(seedHexStr.decode('hex') , roundsToHash).encode('hex')
+            seedHexStr = KeyTreeUtil.sha256Rounds(safe_from_hex(seedHexStr) , roundsToHash).encode('hex')
 
 
     if optionsDict.get(TESTNET) == None or optionsDict.get(TESTNET) == False:
@@ -3899,7 +3907,7 @@ def outputExtKeysFromExtKey(extKey, chainStr, optionsDict, traverseType = DEFAUL
     keyNode = None
     try:
         int(extKey, 16)
-        keyNode = KeyNode(extkey = extKey.decode('hex'))
+        keyNode = KeyNode(extkey = safe_from_hex(extKey))
     except ValueError:
         extKeyBytes = DecodeBase58Check(extKey)
         if not extKeyBytes:
