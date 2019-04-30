@@ -73,13 +73,18 @@ The input seed is coverted to hex before it used as the master seed, or you can 
     ./kt.py --noecho
     ./kt.py -ne
 
+###### To run unit tests do the following:
+    ./kt.py --runtests
+    ./kt.py -rt
+
 ###### You can specify all options at once with the no prompt option. But it is discouraged because on most OS commands are stored in a history file:
     ./kt.py --noprompt -s "this is a password" --chain "(0-1)'/(6-8)'" -trav levelorder
     ./kt.py -np -s "this is a password" -c "(0-1)'/(6-8)'" -hs 3 -v
     ./kt.py -np --extkey xprv9uHRZZhk6KAJC1avXpDAp4MDc3sQKNxDiPvvkX8Br5ngLNv1TxvUxt4cV1rGL5hj6KCesnDYUhd7oWgT11eZG7XnxHrnYeSvkzY7d2bhkJ7 -c "(0-1)'/8"
-    ./kt.py -np --b39 -s "pilot dolphin motion portion survey sock turkey afford destroy knee sock sibling" -c "44'/0'/(0-1)'"
-    ./kt.py -np -sh 936ae011512b96e7ce3ff05d464e3801834d023249baabfebfe13e593dc33610ea68279c271df6bab7cfbea8bbcf470e050fe6589f552f7e1f6c80432c7bcc57 -c "44'/0'/(0-1)'"
+    ./kt.py -np --b39 -s "pilot dolphin motion portion survey sock turkey afford destroy knee sock sibling" -c "44'/0'/(0-1)'/(0-1)/0"
+    ./kt.py -np -sh 936ae011512b96e7ce3ff05d464e3801834d023249baabfebfe13e593dc33610ea68279c271df6bab7cfbea8bbcf470e050fe6589f552f7e1f6c80432c7bcc57 -c "44'/0'/(0-1)'/(0-1)/0"
 
 
 ##### For more information on how to use KeyTree do:
     ./kt.py --help
+    ./kt.py -h

@@ -2152,6 +2152,7 @@ def legendre_symbol(a, p):
 import hashlib, base64, ecdsa, re
 import hmac
 import os, unicodedata
+import unittest
 
 def rev_hex(s):
     return s.decode('hex')[::-1].encode('hex')
@@ -2779,13 +2780,14 @@ You can specify all options at once with the no prompt option. But it is discour
 noInputEcho = False
 
 cmdName = "./kt.py"
-HELP = "-help"
 SEED_FORMAT = "seed_format"
 SEED_VALUE = "seed_value"
 EXTENDEDKEY_VALUE = "extkey_value"
 CHAIN_VALUE = "chain_value"
 MNEMONIC_VALUE = 'mnemonic_value'
 
+HELP = "-help"
+RUN_TESTS = "-runtests"
 NO_INPUT_ECHO = "-noecho"
 TESTNET = "-testnet"
 HASH_SEED = "-hashseed"
@@ -2803,6 +2805,8 @@ VERBOSE_OPTION = "-verbose"
 ENFORCE_BIP39_RULE = "-bip39"
 GENERATE_MNEMONIC_PASSPHRASE = "-generateBIP39mnemonic"
 
+HELP_SHORT = "h"
+RUN_TESTS_SHORT = "rt"
 NO_INPUT_ECHO_SHORT = "ne"
 TESTNET_SHORT = "tn"
 HASH_SEED_SHORT = "hs"
@@ -3198,7 +3202,237 @@ def testVector2():
     #optionsDict[VERBOSE_OPTION] = True
     seed = "fffcf9f6f3f0edeae7e4e1dedbd8d5d2cfccc9c6c3c0bdbab7b4b1aeaba8a5a29f9c999693908d8a8784817e7b7875726f6c696663605d5a5754514e4b484542"
     outputExtKeysFromSeed(seed,"0/2147483647'/1/2147483646'/2", StringType.HEX, 0, optionsDict)
-    
+
+class TestKeyTree(unittest.TestCase):
+    def setUp(self):
+      KeyNode.setTestNet(False)
+
+    def testVector1(self):
+      seedHexStr = "000102030405060708090a0b0c0d0e0f"
+      master_secret, master_chain, master_public_key, master_public_key_compressed = bip32_init(seedHexStr)
+      k = master_secret
+      c = master_chain
+      keyNode = KeyNode(key = k, chain_code = c)
+
+      keyNodePub = keyNode.getPublic()
+      self.assertEquals(keyNodePub.getExtKey(), 'xpub661MyMwAqRbcFtXgS5sYJABqqG9YLmC4Q1Rdap9gSE8NqtwybGhePY2gZ29ESFjqJoCu1Rupje8YtGqsefD265TMg7usUDFdp6W1EGMcet8')
+      self.assertEquals(keyNode.getExtKey(), 'xprv9s21ZrQH143K3QTDL4LXw2F7HEK3wJUD2nW2nRk4stbPy6cq3jPPqjiChkVvvNKmPGJxWUtg6LnF5kejMRNNU3TGtRBeJgk33yuGBxrMPHi')
+      self.assertEquals(keyNode.getPrivKey(True), 'L52XzL2cMkHxqxBXRyEpnPQZGUs3uKiL3R11XbAdHigRzDozKZeW')
+      self.assertEquals(keyNode.getAddress(True), '15mKKb2eos1hWa6tisdPwwDC1a5J1y9nma')
+
+      keyNode = keyNode.getChild(KeyTreeUtil.toPrime(0))
+      keyNodePub = keyNode.getPublic()
+      self.assertEquals(keyNodePub.getExtKey(), 'xpub68Gmy5EdvgibQVfPdqkBBCHxA5htiqg55crXYuXoQRKfDBFA1WEjWgP6LHhwBZeNK1VTsfTFUHCdrfp1bgwQ9xv5ski8PX9rL2dZXvgGDnw')
+      self.assertEquals(keyNode.getExtKey(), 'xprv9uHRZZhk6KAJC1avXpDAp4MDc3sQKNxDiPvvkX8Br5ngLNv1TxvUxt4cV1rGL5hj6KCesnDYUhd7oWgT11eZG7XnxHrnYeSvkzY7d2bhkJ7')
+      self.assertEquals(keyNode.getPrivKey(True), 'L5BmPijJjrKbiUfG4zbiFKNqkvuJ8usooJmzuD7Z8dkRoTThYnAT')
+      self.assertEquals(keyNode.getAddress(True), '19Q2WoS5hSS6T8GjhK8KZLMgmWaq4neXrh')
+
+      keyNode = keyNode.getChild(1)
+      keyNodePub = keyNode.getPublic()
+      self.assertEquals(keyNodePub.getExtKey(), 'xpub6ASuArnXKPbfEwhqN6e3mwBcDTgzisQN1wXN9BJcM47sSikHjJf3UFHKkNAWbWMiGj7Wf5uMash7SyYq527Hqck2AxYysAA7xmALppuCkwQ')
+      self.assertEquals(keyNode.getExtKey(), 'xprv9wTYmMFdV23N2TdNG573QoEsfRrWKQgWeibmLntzniatZvR9BmLnvSxqu53Kw1UmYPxLgboyZQaXwTCg8MSY3H2EU4pWcQDnRnrVA1xe8fs')
+      self.assertEquals(keyNode.getPrivKey(True), 'KyFAjQ5rgrKvhXvNMtFB5PCSKUYD1yyPEe3xr3T34TZSUHycXtMM')
+      self.assertEquals(keyNode.getAddress(True), '1JQheacLPdM5ySCkrZkV66G2ApAXe1mqLj')
+
+      keyNode = keyNode.getChild(KeyTreeUtil.toPrime(2))
+      keyNodePub = keyNode.getPublic()
+      self.assertEquals(keyNodePub.getExtKey(), 'xpub6D4BDPcP2GT577Vvch3R8wDkScZWzQzMMUm3PWbmWvVJrZwQY4VUNgqFJPMM3No2dFDFGTsxxpG5uJh7n7epu4trkrX7x7DogT5Uv6fcLW5')
+      self.assertEquals(keyNode.getExtKey(), 'xprv9z4pot5VBttmtdRTWfWQmoH1taj2axGVzFqSb8C9xaxKymcFzXBDptWmT7FwuEzG3ryjH4ktypQSAewRiNMjANTtpgP4mLTj34bhnZX7UiM')
+      self.assertEquals(keyNode.getPrivKey(True), 'L43t3od1Gh7Lj55Bzjj1xDAgJDcL7YFo2nEcNaMGiyRZS1CidBVU')
+      self.assertEquals(keyNode.getAddress(True), '1NjxqbA9aZWnh17q1UW3rB4EPu79wDXj7x')
+
+      keyNode = keyNode.getChild(2)
+      keyNodePub = keyNode.getPublic()
+      self.assertEquals(keyNodePub.getExtKey(), 'xpub6FHa3pjLCk84BayeJxFW2SP4XRrFd1JYnxeLeU8EqN3vDfZmbqBqaGJAyiLjTAwm6ZLRQUMv1ZACTj37sR62cfN7fe5JnJ7dh8zL4fiyLHV')
+      self.assertEquals(keyNode.getExtKey(), 'xprvA2JDeKCSNNZky6uBCviVfJSKyQ1mDYahRjijr5idH2WwLsEd4Hsb2Tyh8RfQMuPh7f7RtyzTtdrbdqqsunu5Mm3wDvUAKRHSC34sJ7in334')
+      self.assertEquals(keyNode.getPrivKey(True), 'KwjQsVuMjbCP2Zmr3VaFaStav7NvevwjvvkqrWd5Qmh1XVnCteBR')
+      self.assertEquals(keyNode.getAddress(True), '1LjmJcdPnDHhNTUgrWyhLGnRDKxQjoxAgt')
+
+      keyNode = keyNode.getChild(1000000000)
+      keyNodePub = keyNode.getPublic()
+      self.assertEquals(keyNodePub.getExtKey(), 'xpub6H1LXWLaKsWFhvm6RVpEL9P4KfRZSW7abD2ttkWP3SSQvnyA8FSVqNTEcYFgJS2UaFcxupHiYkro49S8yGasTvXEYBVPamhGW6cFJodrTHy')
+      self.assertEquals(keyNode.getExtKey(), 'xprvA41z7zogVVwxVSgdKUHDy1SKmdb533PjDz7J6N6mV6uS3ze1ai8FHa8kmHScGpWmj4WggLyQjgPie1rFSruoUihUZREPSL39UNdE3BBDu76')
+      self.assertEquals(keyNode.getPrivKey(True), 'Kybw8izYevo5xMh1TK7aUr7jHFCxXS1zv8p3oqFz3o2zFbhRXHYs')
+      self.assertEquals(keyNode.getAddress(True), '1LZiqrop2HGR4qrH1ULZPyBpU6AUP49Uam')
+
+    def testVector2(self):
+      seedHexStr = "fffcf9f6f3f0edeae7e4e1dedbd8d5d2cfccc9c6c3c0bdbab7b4b1aeaba8a5a29f9c999693908d8a8784817e7b7875726f6c696663605d5a5754514e4b484542"
+      master_secret, master_chain, master_public_key, master_public_key_compressed = bip32_init(seedHexStr)
+      k = master_secret
+      c = master_chain
+      keyNode = KeyNode(key = k, chain_code = c)
+
+      keyNodePub = keyNode.getPublic()
+      self.assertEquals(keyNodePub.getExtKey(), 'xpub661MyMwAqRbcFW31YEwpkMuc5THy2PSt5bDMsktWQcFF8syAmRUapSCGu8ED9W6oDMSgv6Zz8idoc4a6mr8BDzTJY47LJhkJ8UB7WEGuduB')
+      self.assertEquals(keyNode.getExtKey(), 'xprv9s21ZrQH143K31xYSDQpPDxsXRTUcvj2iNHm5NUtrGiGG5e2DtALGdso3pGz6ssrdK4PFmM8NSpSBHNqPqm55Qn3LqFtT2emdEXVYsCzC2U')
+      self.assertEquals(keyNode.getPrivKey(True), 'KyjXhyHF9wTphBkfpxjL8hkDXDUSbE3tKANT94kXSyh6vn6nKaoy')
+      self.assertEquals(keyNode.getAddress(True), '1JEoxevbLLG8cVqeoGKQiAwoWbNYSUyYjg')
+
+      keyNode = keyNode.getChild(0)
+      keyNodePub = keyNode.getPublic()
+      self.assertEquals(keyNodePub.getExtKey(), 'xpub69H7F5d8KSRgmmdJg2KhpAK8SR3DjMwAdkxj3ZuxV27CprR9LgpeyGmXUbC6wb7ERfvrnKZjXoUmmDznezpbZb7ap6r1D3tgFxHmwMkQTPH')
+      self.assertEquals(keyNode.getExtKey(), 'xprv9vHkqa6EV4sPZHYqZznhT2NPtPCjKuDKGY38FBWLvgaDx45zo9WQRUT3dKYnjwih2yJD9mkrocEZXo1ex8G81dwSM1fwqWpWkeS3v86pgKt')
+      self.assertEquals(keyNode.getPrivKey(True), 'L2ysLrR6KMSAtx7uPqmYpoTeiRzydXBattRXjXz5GDFPrdfPzKbj')
+      self.assertEquals(keyNode.getAddress(True), '19EuDJdgfRkwCmRzbzVBHZWQG9QNWhftbZ')
+
+      keyNode = keyNode.getChild(KeyTreeUtil.toPrime(2147483647))
+      keyNodePub = keyNode.getPublic()
+      self.assertEquals(keyNodePub.getExtKey(), 'xpub6ASAVgeehLbnwdqV6UKMHVzgqAG8Gr6riv3Fxxpj8ksbH9ebxaEyBLZ85ySDhKiLDBrQSARLq1uNRts8RuJiHjaDMBU4Zn9h8LZNnBC5y4a')
+      self.assertEquals(keyNode.getExtKey(), 'xprv9wSp6B7kry3Vj9m1zSnLvN3xH8RdsPP1Mh7fAaR7aRLcQMKTR2vidYEeEg2mUCTAwCd6vnxVrcjfy2kRgVsFawNzmjuHc2YmYRmagcEPdU9')
+      self.assertEquals(keyNode.getPrivKey(True), 'L1m5VpbXmMp57P3knskwhoMTLdhAAaXiHvnGLMribbfwzVRpz2Sr')
+      self.assertEquals(keyNode.getAddress(True), '1Lke9bXGhn5VPrBuXgN12uGUphrttUErmk')
+
+      keyNode = keyNode.getChild(1)
+      keyNodePub = keyNode.getPublic()
+      self.assertEquals(keyNodePub.getExtKey(), 'xpub6DF8uhdarytz3FWdA8TvFSvvAh8dP3283MY7p2V4SeE2wyWmG5mg5EwVvmdMVCQcoNJxGoWaU9DCWh89LojfZ537wTfunKau47EL2dhHKon')
+      self.assertEquals(keyNode.getExtKey(), 'xprv9zFnWC6h2cLgpmSA46vutJzBcfJ8yaJGg8cX1e5StJh45BBciYTRXSd25UEPVuesF9yog62tGAQtHjXajPPdbRCHuWS6T8XA2ECKADdw4Ef')
+      self.assertEquals(keyNode.getPrivKey(True), 'KzyzXnznxSv249b4KuNkBwowaN3akiNeEHy5FWoPCJpStZbEKXN2')
+      self.assertEquals(keyNode.getAddress(True), '1BxrAr2pHpeBheusmd6fHDP2tSLAUa3qsW')
+
+      keyNode = keyNode.getChild(KeyTreeUtil.toPrime(2147483646))
+      keyNodePub = keyNode.getPublic()
+      self.assertEquals(keyNodePub.getExtKey(), 'xpub6ERApfZwUNrhLCkDtcHTcxd75RbzS1ed54G1LkBUHQVHQKqhMkhgbmJbZRkrgZw4koxb5JaHWkY4ALHY2grBGRjaDMzQLcgJvLJuZZvRcEL')
+      self.assertEquals(keyNode.getExtKey(), 'xprvA1RpRA33e1JQ7ifknakTFpgNXPmW2YvmhqLQYMmrj4xJXXWYpDPS3xz7iAxn8L39njGVyuoseXzU6rcxFLJ8HFsTjSyQbLYnMpCqE2VbFWc')
+      self.assertEquals(keyNode.getPrivKey(True), 'L5KhaMvPYRW1ZoFmRjUtxxPypQ94m6BcDrPhqArhggdaTbbAFJEF')
+      self.assertEquals(keyNode.getAddress(True), '15XVotxCAV7sRx1PSCkQNsGw3W9jT9A94R')
+
+      keyNode = keyNode.getChild(2)
+      keyNodePub = keyNode.getPublic()
+      self.assertEquals(keyNodePub.getExtKey(), 'xpub6FnCn6nSzZAw5Tw7cgR9bi15UV96gLZhjDstkXXxvCLsUXBGXPdSnLFbdpq8p9HmGsApME5hQTZ3emM2rnY5agb9rXpVGyy3bdW6EEgAtqt')
+      self.assertEquals(keyNode.getExtKey(), 'xprvA2nrNbFZABcdryreWet9Ea4LvTJcGsqrMzxHx98MMrotbir7yrKCEXw7nadnHM8Dq38EGfSh6dqA9QWTyefMLEcBYJUuekgW4BYPJcr9E7j')
+      self.assertEquals(keyNode.getPrivKey(True), 'L3WAYNAZPxx1fr7KCz7GN9nD5qMBnNiqEJNJMU1z9MMaannAt4aK')
+      self.assertEquals(keyNode.getAddress(True), '14UKfRV9ZPUp6ZC9PLhqbRtxdihW9em3xt')
+
+    def testBIP39AndBIP44_1(self):
+      mnemonic = 'pilot dolphin motion portion survey sock turkey afford destroy knee sock sibling'
+      seedHexStr = '936ae011512b96e7ce3ff05d464e3801834d023249baabfebfe13e593dc33610ea68279c271df6bab7cfbea8bbcf470e050fe6589f552f7e1f6c80432c7bcc57'
+      self.assertEquals(BIP39.phraseIsValid(mnemonic), True)
+      self.assertEquals(binascii.hexlify(BIP39.getMasterHex(mnemonic)), seedHexStr)
+
+      master_secret, master_chain, master_public_key, master_public_key_compressed = bip32_init(seedHexStr)
+      k = master_secret
+      c = master_chain
+      keyNode = KeyNode(key = k, chain_code = c)
+
+      # "44'/0'/(0-1)'/(0-1)/(0-1)
+
+      # "44'/0'/0'
+      keyNodeBIP44Account0 = keyNode.getChild(KeyTreeUtil.toPrime(44)).getChild(KeyTreeUtil.toPrime(0)).getChild(KeyTreeUtil.toPrime(0))
+      keyNodePubkeyNodeBIP44Account0 = keyNodeBIP44Account0.getPublic()
+      self.assertEquals(keyNodePubkeyNodeBIP44Account0.getExtKey(), 'xpub6C8GhTSMvJj3sxXBn2MExN2gNNNheLcp6n82KW2cPbvrMPAB9ph7REGW3NCb1SYVkV8B2Jkkg3YH9k1n9wvV8BdBq87hTHDP9rAo1ajg2zi')
+      self.assertEquals(keyNodeBIP44Account0.getExtKey(), 'xprv9y8vHwuU5wAkfUSifzpEbE5wpLYDEstxjZCRX7czqGPsUaq2cHNrsRx2C4zdbcLguGqsAeJQ82kxnEXcwsYr859mLmd8Z619aAjmoaarJYr')
+
+      k = keyNodeBIP44Account0.getChild(0).getChild(0)
+      # "44'/0'/0'/0/0
+      self.assertEquals(k.getPrivKey(True), 'KxCM9pZVYWQ1KVhsgqs3ityzC6ix934uR4XXurzo2rm2qPhZNCb7')
+      self.assertEquals(k.getAddress(True), '141Cx3X4fy22kBCprmQaFSbEz8R7bPtY6r')
+      k = keyNodeBIP44Account0.getChild(0).getChild(1)
+      # "44'/0'/0'/0/1
+      self.assertEquals(k.getPrivKey(True), 'Kz5JBbALpaf8GmopZSVXqoCvJ42NWBf16jCZaJG7rzuqCARpnjYy')
+      self.assertEquals(k.getAddress(True), '1ARLhiAbSZNC9vv8R1AB5cbc6aWQEpNXJ6')
+
+      k = keyNodeBIP44Account0.getChild(1).getChild(0)
+      # "44'/0'/0'/1/0
+      self.assertEquals(k.getPrivKey(True), 'L43BWnRwRrq6cSMECCqALAT9M1rGZxQNr64WcRGyGQUaysC9vTYW')
+      self.assertEquals(k.getAddress(True), '12e3sfXMoZ2afB8sxTSKyiQgu9cZtzvxHa')
+      k = keyNodeBIP44Account0.getChild(1).getChild(1)
+      # "44'/0'/0'/1/1
+      self.assertEquals(k.getPrivKey(True), 'Kz59nEqpedMQxM4oi5zYSQcF3a7rksCVnh4agonXXRRdUxRBeXzr')
+      self.assertEquals(k.getAddress(True), '1JB6H4KxgGbnYiNNxuHHqhddyPqCbBvtLX')
+
+      # "44'/0'/1'
+      keyNodeBIP44Account1 = keyNode.getChild(KeyTreeUtil.toPrime(44)).getChild(KeyTreeUtil.toPrime(0)).getChild(KeyTreeUtil.toPrime(1))
+      keyNodePubkeyNodeBIP44Account1 = keyNodeBIP44Account1.getPublic()
+      self.assertEquals(keyNodePubkeyNodeBIP44Account1.getExtKey(), 'xpub6C8GhTSMvJj3xRbmbq6uneY49PHP9qBm8pRRv2G4FZHLwWdhTE6Gv1BqpYrL4jCWNB3K7yYCEYxn1TTC7dT749nftPCD8BFnPPNQxi5T2oo')
+      self.assertEquals(keyNodeBIP44Account1.getExtKey(), 'xprv9y8vHwuU5wAkjwXJVoZuRWbKbMStkNTumbVq7drShDkN4iJYugn2NCsMyGqfibc9wyQk9bpZdS2D4wtFHVi2jGB6TcJTA34oJUfJYKZ37XU')
+
+      k = keyNodeBIP44Account1.getChild(0).getChild(0)
+      # "44'/0'/1'/0/0
+      self.assertEquals(k.getPrivKey(True), 'L3w3wFQZZTvgYPXn9ep1MJeYfSenTZ86zqivE1V2ijsJ1vSncrdm')
+      self.assertEquals(k.getAddress(True), '1HaPoaEHYSDZjHR18yxm9DRLrkfX8qpXEX')
+      k = keyNodeBIP44Account1.getChild(0).getChild(1)
+      # "44'/0'/1'/0/1
+      self.assertEquals(k.getPrivKey(True), 'Kz2EfWsP8toKdbBpdGyrQL3rR83bpLbrqmhpGjotMXnbrvGebsum')
+      self.assertEquals(k.getAddress(True), '18bGTq3Q8AnKwSMFjsuHvG8pVcYJFa6v7A')
+
+      k = keyNodeBIP44Account1.getChild(1).getChild(0)
+      # "44'/0'/1'/1/0
+      self.assertEquals(k.getPrivKey(True), 'L1w4DP1b98vaghjsqK7g9vWE4ANkBjfgXfBaKYrS7HofQ4NKombU')
+      self.assertEquals(k.getAddress(True), '1DjZygViqqRRfwwZxK7CssnnpQooAHheuh')
+      k = keyNodeBIP44Account1.getChild(1).getChild(1)
+      # "44'/0'/1'/1/1
+      self.assertEquals(k.getPrivKey(True), 'L5jS5VLsGGYg2XnkUBS4x9qfpeeASx6ZpAFy8Uh39ggc2SEaneop')
+      self.assertEquals(k.getAddress(True), '155P6c59ixhpQyfn7a9mZbH9qsNaVE4Shv')
+
+    def testBIP39AndBIP44_2(self):
+      mnemonic = 'payment minute try rifle weekend spin sentence slush iron fury artist slogan'
+      seedHexStr = '3a73c9afd0c9c585d5d1197252ea64030d099c931ebc388b85ba61d95c42503c51e42d3161e0e7fe9933b4dc8866ac390f70e296661462b2deb27f59cb87389c'
+      self.assertEquals(BIP39.phraseIsValid(mnemonic), True)
+      self.assertEquals(binascii.hexlify(BIP39.getMasterHex(mnemonic)), seedHexStr)
+
+      master_secret, master_chain, master_public_key, master_public_key_compressed = bip32_init(seedHexStr)
+      k = master_secret
+      c = master_chain
+      keyNode = KeyNode(key = k, chain_code = c)
+
+      # "44'/0'/(0-1)'/(0-1)/(0-1)
+
+      # "44'/0'/0'
+      keyNodeBIP44Account0 = keyNode.getChild(KeyTreeUtil.toPrime(44)).getChild(KeyTreeUtil.toPrime(0)).getChild(KeyTreeUtil.toPrime(0))
+      keyNodePubkeyNodeBIP44Account0 = keyNodeBIP44Account0.getPublic()
+      self.assertEquals(keyNodePubkeyNodeBIP44Account0.getExtKey(), 'xpub6CKJAMrz4m23L1tHakEGy4X9dr9Re39YES4XunwZkZn78HCpcXj9kYWfYaeAtA7H1rrmebffgg6fAPR1GJbHJqVnUS7pmBkwoMB7uW3Ftju')
+      self.assertEquals(keyNodeBIP44Account0.getExtKey(), 'xprv9yKwkrL6EPTk7XopUihGbvaR5pJwEaRgsD8w7QXxCEF8FUsg4zQuCkCBhKxA8zrXMQ2rqSEcmDEc5DcPKYz4Jbbk1ryX4eSWfpgYRZqWW3b')
+
+      k = keyNodeBIP44Account0.getChild(0).getChild(0)
+      # "44'/0'/0'/0/0
+      self.assertEquals(k.getPrivKey(True), 'L2485SWvCq24gLnkaWhJB7hgKhCuWKNrFUPoZYivrhtPHDLVucwc')
+      self.assertEquals(k.getAddress(True), '1FaRiujjaQSC6585ixvRepBionjyzM6drN')
+      k = keyNodeBIP44Account0.getChild(0).getChild(1)
+      # "44'/0'/0'/0/1
+      self.assertEquals(k.getPrivKey(True), 'L2wXUmKTwKsQM5DiproJpwgzhnN7p5FCzd6XoteXAb1ky1bi7LeG')
+      self.assertEquals(k.getAddress(True), '1NR4SxQioSepwBS6N6pdJ18uBT4H9Yxct')
+
+      k = keyNodeBIP44Account0.getChild(1).getChild(0)
+      # "44'/0'/0'/1/0
+      self.assertEquals(k.getPrivKey(True), 'L3grZRytSJxVberN8Z5yNocvq4vEgX1ng2oZm1SG6MSJD25F72ZA')
+      self.assertEquals(k.getAddress(True), '1HhCwuYhxtG8Ums95ZTuYciayJbDNy9ofQ')
+      k = keyNodeBIP44Account0.getChild(1).getChild(1)
+      # "44'/0'/0'/1/1
+      self.assertEquals(k.getPrivKey(True), 'KwraHz3vtY22aaGP1jfpoY7xk1fHRHsURLLUcitzDNs7dz321e1p')
+      self.assertEquals(k.getAddress(True), '1AXvaXfeUyrod7xfxjQzDfKTipfeNdktg8')
+
+      # "44'/0'/1'
+      keyNodeBIP44Account1 = keyNode.getChild(KeyTreeUtil.toPrime(44)).getChild(KeyTreeUtil.toPrime(0)).getChild(KeyTreeUtil.toPrime(1))
+      keyNodePubkeyNodeBIP44Account1 = keyNodeBIP44Account1.getPublic()
+      self.assertEquals(keyNodePubkeyNodeBIP44Account1.getExtKey(), 'xpub6CKJAMrz4m23Q36BMYQmR5eWaG19Gc41knevzToxToqpc5j5owUXiEBg1DG8pdiQ7vvq5prrB7HPLTzS7CtV7rzexSZ33sWmXnRD6yMB9G1')
+      self.assertEquals(keyNodeBIP44Account1.getExtKey(), 'xprv9yKwkrL6EPTkBZ1iFWsm3whn2EAes9LAPZjLC5QLuUJqjHPwGQAHARsC9xFXi9H96w5x7fSNn1GWD7xEo1Mam5PY87yzPNP5KMPQMhuR3ip')
+
+      k = keyNodeBIP44Account1.getChild(0).getChild(0)
+      # "44'/0'/1'/0/0
+      self.assertEquals(k.getPrivKey(True), 'L4RidpdkZSbVRnjtCRtXZdnpQe6GwG2GDB6315tMbAmfkdo4DZsD')
+      self.assertEquals(k.getAddress(True), '1LEtY7Vqfg6QEvNnQrrbYLpLQjFmqt84XD')
+      k = keyNodeBIP44Account1.getChild(0).getChild(1)
+      # "44'/0'/1'/0/1
+      self.assertEquals(k.getPrivKey(True), 'KyTWJGcG6BgsUsR3LE5SEEqCo3ZD7sh5sgLSFe5vyXkbraJcwmZy')
+      self.assertEquals(k.getAddress(True), '14rNR9AWgiHCDtjUYUWn1JwEWSxtTeiaui')
+
+      k = keyNodeBIP44Account1.getChild(1).getChild(0)
+      # "44'/0'/1'/1/0
+      self.assertEquals(k.getPrivKey(True), 'L2dfzRoFiQK2VgaGyYWnuFz82CqTdzJXEmMRsBMxh7eZsMV4iC4J')
+      self.assertEquals(k.getAddress(True), '1D28BJPdrdhRzYzPHsdktDPKSP5ZKX54df')
+      k = keyNodeBIP44Account1.getChild(1).getChild(1)
+      # "44'/0'/1'/1/1
+      self.assertEquals(k.getPrivKey(True), 'L54L4MYkj4sBMzW5Zs44EMEtiRk51ng7PB2p69B8ZBynonu6EsxX')
+      self.assertEquals(k.getAddress(True), '1Hko6Wt7D2NL6djdjGz7vxgXwhTEMWaQKQ')
+
+def suite():
+  suite = unittest.TestSuite()
+  suite.addTest(TestKeyTree('testVector1'))
+  suite.addTest(TestKeyTree('testVector2'))
+  suite.addTest(TestKeyTree('testBIP39AndBIP44_1'))
+  suite.addTest(TestKeyTree('testBIP39AndBIP44_2'))
+  return suite
+
 def parse_arguments(argv):
     argsDict = {}
     it = 0
@@ -3208,8 +3442,11 @@ def parse_arguments(argv):
             raise ValueError("Invalid arguments.")
 
         arg = arg[1:]
-        if arg == HELP:
+        if arg == HELP or arg == HELP_SHORT:
             argsDict[HELP] = HELP
+            break
+        elif arg == RUN_TESTS or arg == RUN_TESTS_SHORT:
+            argsDict[RUN_TESTS] = "Y"
             break
         elif arg == SEED or arg == SEED_SHORT:
             argsDict[SEED_FORMAT] = "" #assumes ascii
@@ -3351,12 +3588,22 @@ def outputExamples():
     outputString(cmdName+" -ne")
     outputString("")
 
-    outputString("You can specify all options at once with the no prompt option. But it is discouraged because on most OS commands are stored in a history file:")
+    outputString("To run unit tests do the following:")
+    outputString(cmdName+" --runtests")
+    outputString(cmdName+" -rt")
+    outputString("")
+
+    outputString("For information on how to use KeyTree do:")
+    outputString(cmdName+" --help")
+    outputString(cmdName+" -h")
+    outputString("")
+
+    outputString("You can specify all options at once with the no prompt option. But it is discouraged because on most OSs, commands are stored in a history file:")
     outputString(cmdName+" --noprompt -s \"this is a password\" --chain \"(0-1)'/(6-8)'\" -trav levelorder")
     outputString(cmdName+" -np -s \"this is a password\" -c \"(0-1)'/(6-8)'\" -hs 3 -v")
     outputString(cmdName+" -np --extkey xprv9uHRZZhk6KAJC1avXpDAp4MDc3sQKNxDiPvvkX8Br5ngLNv1TxvUxt4cV1rGL5hj6KCesnDYUhd7oWgT11eZG7XnxHrnYeSvkzY7d2bhkJ7 -c \"(0-1)'/8\"")
-    outputString(cmdName+" -np --b39 -s \"pilot dolphin motion portion survey sock turkey afford destroy knee sock sibling\" -c \"44'/0'/(0-1)'\"")
-    outputString(cmdName+" -np -sh 936ae011512b96e7ce3ff05d464e3801834d023249baabfebfe13e593dc33610ea68279c271df6bab7cfbea8bbcf470e050fe6589f552f7e1f6c80432c7bcc57 -c \"44'/0'/(0-1)'\"")
+    outputString(cmdName+" -np --b39 -s \"pilot dolphin motion portion survey sock turkey afford destroy knee sock sibling\" -c \"44'/0'/(0-1)'/(0-1)/0\"")
+    outputString(cmdName+" -np -sh 936ae011512b96e7ce3ff05d464e3801834d023249baabfebfe13e593dc33610ea68279c271df6bab7cfbea8bbcf470e050fe6589f552f7e1f6c80432c7bcc57 -c \"44'/0'/(0-1)'/(0-1)/0\"")
     outputString("")
 
 def getTreeTraversalOption(treeTraversalOption):
@@ -3377,11 +3624,17 @@ def get_input(pretext):
     if noInputEcho:
         return getpass.getpass(pretext+'\n')
     else:   
-        return raw_input(pretext+'\n')
+        if sys.version_info.major == 2:
+          return raw_input(pretext+'\n')
+        else:
+          return input(pretext+'\n')
 
 def enter_prompt(argsDict):
     if argsDict.get(HELP) == HELP:
         outputExamples()
+    elif argsDict.get(RUN_TESTS):
+        runner = unittest.TextTestRunner()
+        runner.run(suite())
     else:
         optionsDict = {}
         optionsDict[TESTNET] = getOptionValue(argsDict.get(TESTNET))
@@ -3432,7 +3685,9 @@ def handle_arguments(argsDict):
 
     if argsDict.get(HELP) == HELP:
         outputExamples()
-        return 0
+    elif argsDict.get(RUN_TESTS):
+        runner = unittest.TextTestRunner()
+        runner.run(suite())
     else:
         optionsDict = {}
         optionsDict[TESTNET] = getOptionValue(argsDict.get(TESTNET))
