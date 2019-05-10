@@ -2052,11 +2052,186 @@ WORD_LIST = [
 
 import sys
 if sys.version_info.major == 2:
+  # Base switching
+  code_strings = {
+      2: '01',
+      10: '0123456789',
+      16: '0123456789abcdef',
+      32: 'abcdefghijklmnopqrstuvwxyz234567',
+      58: '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz',
+      256: ''.join([chr(x) for x in range(256)])
+  }
+
+  def bin_dbl_sha256(s):
+      bytes_to_hash = from_string_to_bytes(s)
+      return hashlib.sha256(hashlib.sha256(bytes_to_hash).digest()).digest()
+
+  def get_code_string(base):
+      if base in code_strings:
+          return code_strings[base]
+      else:
+          raise ValueError("Invalid base!")
+
+  def changebase(string, frm, to, minlen=0):
+      if frm == to:
+          return lpad(string, get_code_string(frm)[0], minlen)
+      return encode(decode(string, frm), to, minlen)
+
+  def bin_to_b58check(inp, magicbyte=0):
+      while magicbyte > 0:
+          inp = chr(int(magicbyte % 256)) + inp
+          magicbyte //= 256
+      leadingzbytes = len(re.match('^\x00*', inp).group(0))
+      checksum = bin_dbl_sha256(inp)[:4]
+      return '1' * leadingzbytes + changebase(inp+checksum, 256, 58)
+
+  def bytes_to_hex_string(b):
+      return b.encode('hex')
+
   def safe_from_hex(s):
-    return s.decode('hex')
+      return s.decode('hex')
+
+  def from_int_to_byte(a):
+      return chr(a)
+
+  def from_byte_to_int(a):
+      return ord(a)
+
+  def from_string_to_bytes(a):
+      return a
+
+  def safe_hexlify(a):
+      return binascii.hexlify(a)
+
+  def encode(val, base, minlen=0):
+      base, minlen = int(base), int(minlen)
+      code_string = get_code_string(base)
+      result = ""
+      while val > 0:
+          result = code_string[val % base] + result
+          val //= base
+      return code_string[0] * max(minlen - len(result), 0) + result
+
+  def decode(string, base):
+      base = int(base)
+      code_string = get_code_string(base)
+      result = 0
+      if base == 16:
+          string = string.lower()
+      while len(string) > 0:
+          result *= base
+          result += code_string.find(string[0])
+          string = string[1:]
+      return result
 else:
+  # Base switching
+  code_strings = {
+      2: '01',
+      10: '0123456789',
+      16: '0123456789abcdef',
+      32: 'abcdefghijklmnopqrstuvwxyz234567',
+      58: '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz',
+      256: ''.join([chr(x) for x in range(256)])
+  }
+
+  def bin_dbl_sha256(s):
+      bytes_to_hash = from_string_to_bytes(s)
+      return hashlib.sha256(hashlib.sha256(bytes_to_hash).digest()).digest()
+
+  def get_code_string(base):
+      if base in code_strings:
+          return code_strings[base]
+      else:
+          raise ValueError("Invalid base!")
+
+  def changebase(string, frm, to, minlen=0):
+      if frm == to:
+          return lpad(string, get_code_string(frm)[0], minlen)
+      return encode(decode(string, frm), to, minlen)
+
+  def bin_to_b58check(inp, magicbyte=0):
+      while magicbyte > 0:
+          inp = from_int_to_byte(magicbyte % 256) + inp
+          magicbyte //= 256
+
+      leadingzbytes = 0
+      for x in inp:
+          if x != 0:
+              break
+          leadingzbytes += 1
+
+      checksum = bin_dbl_sha256(inp)[:4]
+      return '1' * leadingzbytes + changebase(inp+checksum, 256, 58)
+
+  def bytes_to_hex_string(b):
+      if isinstance(b, str):
+          return b
+
+      return ''.join('{:02x}'.format(y) for y in b)
+
   def safe_from_hex(s):
-    return bytes.fromhex(s)
+      return bytes.fromhex(s)
+
+  def from_int_to_byte(a):
+      return bytes([a])
+
+  def from_byte_to_int(a):
+      return a
+
+  def from_string_to_bytes(a):
+      return a if isinstance(a, bytes) else bytes(a, 'utf-8')
+
+  def safe_hexlify(a):
+      return str(binascii.hexlify(a), 'utf-8')
+
+  def encode(val, base, minlen=0):
+      base, minlen = int(base), int(minlen)
+      code_string = get_code_string(base)
+      result_bytes = bytes()
+      while val > 0:
+          curcode = code_string[val % base]
+          result_bytes = bytes([ord(curcode)]) + result_bytes
+          val //= base
+
+      pad_size = minlen - len(result_bytes)
+
+      padding_element = b'\x00' if base == 256 else b'1' \
+          if base == 58 else b'0'
+      if (pad_size > 0):
+          result_bytes = padding_element*pad_size + result_bytes
+
+      result_string = ''.join([chr(y) for y in result_bytes])
+      result = result_bytes if base == 256 else result_string
+
+      return result
+
+  def decode(string, base):
+      if base == 256 and isinstance(string, str):
+          string = bytes(bytearray.fromhex(string))
+      base = int(base)
+      code_string = get_code_string(base)
+      result = 0
+      if base == 256:
+          def extract(d, cs):
+              return d
+      else:
+          def extract(d, cs):
+              return cs.find(d if isinstance(d, str) else chr(d))
+
+      if base == 16:
+          string = string.lower()
+      while len(string) > 0:
+          result *= base
+          result += extract(string[0], code_string)
+          string = string[1:]
+
+      return result
+
+def b58check_to_bin(inp):
+    leadingzbytes = len(re.match('^1*', inp).group(0))
+    data = b'\x00' * leadingzbytes + changebase(inp, 58, 256)
+    assert bin_dbl_sha256(data[:-4])[:4] == data[-4:]
+    return data[:-4]
 
 # from http://eli.thegreenplace.net/2009/03/07/computing-modular-square-roots-in-python/
 
@@ -2086,7 +2261,7 @@ def modular_sqrt(a, p):
     elif p == 2:
         return p
     elif p % 4 == 3:
-        return pow(a, (p + 1) / 4, p)
+        return pow(a, (p + 1) // 4, p)
     
     # Partition p-1 to s * 2^e for an odd s (i.e.
     # reduce all the powers of 2 from p-1)
@@ -2094,7 +2269,7 @@ def modular_sqrt(a, p):
     s = p - 1
     e = 0
     while s % 2 == 0:
-        s /= 2
+        s //= 2
         e += 1
         
     # Find some 'n' with a legendre symbol n|p = -1.
@@ -2119,7 +2294,7 @@ def modular_sqrt(a, p):
     # both a and b
     # r is the exponent - decreases with each update
     #
-    x = pow(a, (s + 1) / 2, p)
+    x = pow(a, (s + 1) // 2, p)
     b = pow(a, s, p)
     g = pow(n, s, p)
     r = e
@@ -2127,7 +2302,7 @@ def modular_sqrt(a, p):
     while True:
         t = b
         m = 0
-        for m in xrange(r):
+        for m in range(r):
             if t == 1:
                 break
             t = pow(t, 2, p)
@@ -2150,7 +2325,7 @@ def legendre_symbol(a, p):
     Returns 1 if a has a square root modulo
     p, -1 otherwise.
     """
-    ls = pow(a, (p - 1) / 2, p)
+    ls = pow(a, (p - 1) // 2, p)
     return -1 if ls == p - 1 else ls
 
 # much of the code is 'borrowed' from electrum,
@@ -2163,7 +2338,7 @@ import os, unicodedata
 import unittest
 
 def rev_hex(s):
-    return safe_from_hex(s)[::-1].encode('hex')
+    return bytes_to_hex_string(safe_from_hex(s)[::-1])
 
 def int_to_hex(i, length=1):
     s = hex(i)[2:].rstrip('L')
@@ -2186,7 +2361,10 @@ def sha256(x):
     return hashlib.sha256(x).digest()
 
 def Hash(x):
-    if type(x) is unicode: x=x.encode('utf-8')
+    if sys.version_info.major == 2:
+      if type(x) is unicode: x=x.encode('utf-8')
+    else:
+      if type(x) is str: x=x.encode('utf-8')
     return sha256(sha256(x))
 
 # pywallet openssl private key implementation
@@ -2255,88 +2433,25 @@ def public_key_to_bc_address(public_key):
     return hash_160_to_bc_address(h160)
 
 def hash_160_to_bc_address(h160, addrtype = 0):
-    vh160 = chr(addrtype) + h160
-    h = Hash(vh160)
-    addr = vh160 + h[0:4]
-    return b58encode(addr)
+    vh160 = from_string_to_bytes(chr(addrtype)) + from_string_to_bytes(h160)
+    return bin_to_b58check(vh160)
 
 def bc_address_to_hash_160(addr):
-    bytes = b58decode(addr, 25)
-    return ord(bytes[0]), bytes[1:21]
-
-
-__b58chars = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
-__b58base = len(__b58chars)
-
-def b58encode(v):
-    """ encode v, which is a string of bytes, to base58."""
-
-    long_value = 0L
-    for (i, c) in enumerate(v[::-1]):
-        long_value += (256**i) * ord(c)
-
-    result = ''
-    while long_value >= __b58base:
-        div, mod = divmod(long_value, __b58base)
-        result = __b58chars[mod] + result
-        long_value = div
-    result = __b58chars[long_value] + result
-
-    # Bitcoin does a little leading-zero-compression:
-    # leading 0-bytes in the input become leading-1s
-    nPad = 0
-    for c in v:
-        if c == '\0': nPad += 1
-        else: break
-
-    return (__b58chars[0]*nPad) + result
-
-def b58decode(v, length):
-    """ decode v into a string of len bytes."""
-    long_value = 0L
-    for (i, c) in enumerate(v[::-1]):
-        long_value += __b58chars.find(c) * (__b58base**i)
-
-    result = ''
-    while long_value >= 256:
-        div, mod = divmod(long_value, 256)
-        result = chr(mod) + result
-        long_value = div
-    result = chr(long_value) + result
-
-    nPad = 0
-    for c in v:
-        if c == __b58chars[0]: nPad += 1
-        else: break
-
-    result = chr(0)*nPad + result
-    if length is not None and len(result) != length:
-        return None
-
-    return result
-
+    bytes = b58check_to_bin(addr)
+    return ord(from_int_to_byte(from_byte_to_int(bytes[0]))), bytes[1:21]
 
 def EncodeBase58Check(vchIn):
-    hash = Hash(vchIn)
-    return b58encode(vchIn + hash[0:4])
+    return bin_to_b58check(vchIn)
 
 def DecodeBase58Check(psz):
-    vchRet = b58decode(psz, None)
-    key = vchRet[0:-4]
-    csum = vchRet[-4:]
-    hash = Hash(key)
-    cs32 = hash[0:4]
-    if cs32 != csum:
-        return None
-    else:
-        return key
+    return b58check_to_bin(psz)
 
 def PrivKeyToSecret(privkey):
     return privkey[9:9+32]
 
 def SecretToASecret(secret, compressed=False, addrtype=0):
-    vchIn = chr((addrtype+128)&255) + secret
-    if compressed: vchIn += '\01'
+    vchIn = from_int_to_byte((addrtype+128)&255) + secret
+    if compressed: vchIn += b'\01'
     return EncodeBase58Check(vchIn)
 
 def ASecretToSecret(key, addrtype=0):
@@ -2373,7 +2488,7 @@ def public_key_from_private_key(sec):
     assert pkey
     compressed = is_compressed(sec)
     public_key = GetPubKey(pkey.pubkey, compressed)
-    return public_key.encode('hex')
+    return bytes_to_hex_string(public_key)
 
 
 def address_from_private_key(sec):
@@ -2397,7 +2512,7 @@ def is_valid(addr):
 try:
     from ecdsa.ecdsa import curve_secp256k1, generator_secp256k1
 except Exception:
-    print "cannot import ecdsa.curve_secp256k1. You probably need to upgrade ecdsa.\nTry: sudo pip install --upgrade ecdsa"
+    print("cannot import ecdsa.curve_secp256k1. You probably need to upgrade ecdsa.\nTry: sudo pip install --upgrade ecdsa")
     exit()
 
 from ecdsa.curves import SECP256k1
@@ -2406,7 +2521,7 @@ from ecdsa.util import string_to_number, number_to_string
 
 def msg_magic(message):
     varint = var_int(len(message))
-    encoded_varint = "".join([chr(int(varint[i:i+2], 16)) for i in xrange(0, len(varint), 2)])
+    encoded_varint = "".join([chr(int(varint[i:i+2], 16)) for i in range(0, len(varint), 2)])
     return "\x18Bitcoin Signed Message:\n" + encoded_varint + message
 
 
@@ -2424,7 +2539,7 @@ def encrypt_message(message, pubkey):
 
 
 def chunks(l, n):
-    return [l[i:i+n] for i in xrange(0, len(l), n)]
+    return [l[i:i+n] for i in range(0, len(l), n)]
 
 
 def ECC_YfromX(x,curved=curve_secp256k1, odd=True):
@@ -2434,7 +2549,7 @@ def ECC_YfromX(x,curved=curve_secp256k1, odd=True):
     for offset in range(128):
         Mx = x + offset
         My2 = pow(Mx, 3, _p) + _a * pow(Mx, 2, _p) + _b % _p
-        My = pow(My2, (_p+1)/4, _p )
+        My = pow(My2, (_p+1)//4, _p )
 
         if curved.contains_point(Mx,My):
             if odd == bool(My&1):
@@ -2444,10 +2559,10 @@ def ECC_YfromX(x,curved=curve_secp256k1, odd=True):
 
 def private_header(msg,v):
     assert v<1, "Can't write version %d private header"%v
-    r = ''
+    r = b''
     if v==0:
         r += safe_from_hex(('%08x'%len(msg)))
-        r += sha256(msg)[:2]
+        r += sha256(msg.encode('utf-8'))[:2]
     return safe_from_hex(('%02x'%v)) + safe_from_hex(('%04x'%len(r))) + r
 
 def public_header(pubkey,v):
@@ -2455,7 +2570,7 @@ def public_header(pubkey,v):
     r = ''
     if v==0:
         r = sha256(pubkey)[:2]
-    return '\x6a\x6a' + safe_from_hex(('%02x'%v)) + safe_from_hex(('%04x'%len(r))) + r
+    return b'\x6a\x6a' + safe_from_hex(('%02x'%v)) + safe_from_hex(('%04x'%len(r))) + r
 
 
 def negative_point(P):
@@ -2472,11 +2587,11 @@ def ser_to_point(Aser):
     curve = curve_secp256k1
     generator = generator_secp256k1
     _r  = generator.order()
-    assert Aser[0] in ['\x02','\x03','\x04']
-    if Aser[0] == '\x04':
+    assert from_int_to_byte(from_byte_to_int(Aser[0])) in [b'\x02',b'\x03',b'\x04']
+    if from_int_to_byte(from_byte_to_int(Aser[0])) == b'\x04':
         return Point( curve, str_to_long(Aser[1:33]), str_to_long(Aser[33:]), _r )
     Mx = string_to_number(Aser[1:])
-    return Point( curve, Mx, ECC_YfromX(Mx, curve, Aser[0]=='\x03')[0], _r )
+    return Point( curve, Mx, ECC_YfromX(Mx, curve, from_int_to_byte(from_byte_to_int(Aser[0]))==b'\x03')[0], _r )
 
 
 
@@ -2488,7 +2603,7 @@ class EC_KEY(object):
         self.secret = secret
 
     def get_public_key(self, compressed=True):
-        return point_to_ser(self.pubkey.point, compressed).encode('hex')
+        return bytes_to_hex_string(point_to_ser(self.pubkey.point, compressed))
 
     def sign_message(self, message, compressed, address):
         private_key = ecdsa.SigningKey.from_secret_exponent( self.secret, curve = SECP256k1 )
@@ -2496,7 +2611,7 @@ class EC_KEY(object):
         signature = private_key.sign_digest_deterministic( Hash( msg_magic(message) ), hashfunc=hashlib.sha256, sigencode = ecdsa.util.sigencode_string )
         assert public_key.verify_digest( signature, Hash( msg_magic(message) ), sigdecode = ecdsa.util.sigdecode_string)
         for i in range(4):
-            sig = base64.b64encode( chr(27 + i + (4 if compressed else 0)) + signature )
+            sig = base64.b64encode( from_int_to_byte(27 + i + (4 if compressed else 0)) + signature )
             try:
                 self.verify_message( address, sig, message)
                 return sig
@@ -2517,7 +2632,7 @@ class EC_KEY(object):
         sig = base64.b64decode(signature)
         if len(sig) != 65: raise Exception("Wrong encoding")
         r,s = util.sigdecode_string(sig[1:], order)
-        nV = ord(sig[0])
+        nV = ord(from_int_to_byte(from_byte_to_int(sig[0])))
         if nV < 27 or nV >= 35:
             raise Exception("Bad encoding")
         if nV >= 31:
@@ -2528,7 +2643,7 @@ class EC_KEY(object):
 
         recid = nV - 27
         # 1.1
-        x = r + (recid/2) * order
+        x = r + (recid//2) * order
         # 1.3
         alpha = ( x * x * x  + curve.a() * x + curve.b() ) % curve.p()
         beta = modular_sqrt(alpha, curve.p())
@@ -2558,9 +2673,9 @@ class EC_KEY(object):
     def encrypt_message(self, message, pubkey):
         generator = generator_secp256k1
         curved = curve_secp256k1
-        r = ''
-        msg = private_header(message,0) + message
-        msg = msg + ('\x00'*( 32-(len(msg)%32) ))
+        r = b''
+        msg = private_header(message,0) + from_string_to_bytes(message)
+        msg = msg + (b'\x00'*( 32-(len(msg)%32) ))
         msgs = chunks(msg,32)
 
         _r  = generator.order()
@@ -2568,7 +2683,7 @@ class EC_KEY(object):
 
         P = generator
         if len(pubkey)==33: #compressed
-            pk = Point( curve_secp256k1, str_to_long(pubkey[1:33]), ECC_YfromX(str_to_long(pubkey[1:33]), curve_secp256k1, pubkey[0]=='\x03')[0], _r )
+            pk = Point( curve_secp256k1, str_to_long(pubkey[1:33]), ECC_YfromX(str_to_long(pubkey[1:33]), curve_secp256k1, from_int_to_byte(from_byte_to_int(pubkey[0]))==b'\x03')[0], _r )
         else:
             pk = Point( curve_secp256k1, str_to_long(pubkey[1:33]), str_to_long(pubkey[33:65]), _r )
 
@@ -2580,7 +2695,7 @@ class EC_KEY(object):
             T = P*n
             U = pk*n + M
             toadd = point_to_ser(T) + point_to_ser(U)
-            toadd = chr(ord(toadd[0])-2 + 2*xoffset) + toadd[1:]
+            toadd = from_int_to_byte(from_byte_to_int(toadd[0])-2 + 2*xoffset) + toadd[1:]
             r += toadd
 
         return base64.b64encode(public_header(pubkey,0) + r)
@@ -2594,29 +2709,29 @@ class EC_KEY(object):
         enc = base64.b64decode(enc)
         str_to_long = string_to_number
 
-        assert enc[:2]=='\x6a\x6a'
+        assert enc[:2]==b'\x6a\x6a'
 
-        phv = str_to_long(enc[2])
+        phv = str_to_long(from_int_to_byte(from_byte_to_int(enc[2])))
         assert phv==0, "Can't read version %d public header"%phv
         hs = str_to_long(enc[3:5])
         public_header=enc[5:5+hs]
         checksum_pubkey=public_header[:2]
-        address=filter(lambda x:sha256(x)[:2]==checksum_pubkey, pubkeys)
+        address=list(filter(lambda x:sha256(x)[:2]==checksum_pubkey, pubkeys))
         assert len(address)>0, 'Bad private key'
         address=address[0]
         enc=enc[5+hs:]
-        r = ''
+        r = b''
         for Tser,User in map(lambda x:[x[:33],x[33:]], chunks(enc,66)):
-            ots = ord(Tser[0])
+            ots = ord(from_int_to_byte(from_byte_to_int(Tser[0])))
             xoffset = ots>>1
-            Tser = chr(2+(ots&1))+Tser[1:]
+            Tser = from_int_to_byte(2+(ots&1))+Tser[1:]
             T = ser_to_point(Tser)
             U = ser_to_point(User)
             V = T*pvk
             Mcalc = U + negative_point(V)
             r += safe_from_hex(('%064x'%(Mcalc.x()-xoffset)))
 
-        pvhv = str_to_long(r[0])
+        pvhv = str_to_long(from_int_to_byte(from_byte_to_int(r[0])))
         assert pvhv==0, "Can't read version %d private header"%pvhv
         phs = str_to_long(r[1:3])
         private_header = r[3:3+phs]
@@ -2641,8 +2756,8 @@ BIP32_PRIME = 0x80000000
 
 def bip32_init(seed):
     import hmac
-    seed = seed.decode('hex')        
-    I = hmac.new("Bitcoin seed", seed, hashlib.sha512).digest()
+    seed = safe_from_hex(seed)
+    I = hmac.new(b"Bitcoin seed", seed, hashlib.sha512).digest()
 
     master_secret = I[0:32]
     master_chain = I[32:]
@@ -2677,7 +2792,7 @@ def CKD(k, c, n):
     K = GetPubKey(keypair.pubkey,True)
 
     if n & BIP32_PRIME: # We want to make a "secret" address that can't be determined from K
-        data = chr(0) + k + safe_from_hex(rev_hex(int_to_hex(n,4)))
+        data = from_string_to_bytes(chr(0)) + k + safe_from_hex(rev_hex(int_to_hex(n,4)))
         I = hmac.new(c, data, hashlib.sha512).digest()
     else: # We want a "non-secret" address that can be determined from K
         I = hmac.new(c, K + safe_from_hex(rev_hex(int_to_hex(n,4))), hashlib.sha512).digest()
@@ -2716,31 +2831,31 @@ def CKD_prime(K, c, n):
 
 
 
-def bip32_private_derivation(k, c, branch, sequence):
-    assert sequence.startswith(branch)
-    sequence = sequence[len(branch):]
-    for n in sequence.split('/'):
-        if n == '': continue
-        n = int(n[:-1]) + BIP32_PRIME if n[-1] == "'" else int(n)
-        k, c = CKD(k, c, n)
-    K, K_compressed = get_pubkeys_from_secret(k)
-    return k.encode('hex'), c.encode('hex'), K.encode('hex'), K_compressed.encode('hex')
+# def bip32_private_derivation(k, c, branch, sequence):
+#     assert sequence.startswith(branch)
+#     sequence = sequence[len(branch):]
+#     for n in sequence.split('/'):
+#         if n == '': continue
+#         n = int(n[:-1]) + BIP32_PRIME if n[-1] == "'" else int(n)
+#         k, c = CKD(k, c, n)
+#     K, K_compressed = get_pubkeys_from_secret(k)
+#     return bytes_to_hex_string(k), bytes_to_hex_string(c), bytes_to_hex_string(K), bytes_to_hex_string(K_compressed)
 
 
-def bip32_public_derivation(c, K, branch, sequence):
-    assert sequence.startswith(branch)
-    sequence = sequence[len(branch):]
-    for n in sequence.split('/'):
-        n = int(n)
-        K, cK, c = CKD_prime(K, c, n)
+# def bip32_public_derivation(c, K, branch, sequence):
+#     assert sequence.startswith(branch)
+#     sequence = sequence[len(branch):]
+#     for n in sequence.split('/'):
+#         n = int(n)
+#         K, cK, c = CKD_prime(K, c, n)
 
-    return c.encode('hex'), K.encode('hex'), cK.encode('hex')
+#     return bytes_to_hex_string(c), bytes_to_hex_string(K), bytes_to_hex_string(cK)
 
 
-def bip32_private_key(sequence, k, chain):
-    for i in sequence:
-        k, chain = CKD(k, chain, i)
-    return SecretToASecret(k, True)
+# def bip32_private_key(sequence, k, chain):
+#     for i in sequence:
+#         k, chain = CKD(k, chain, i)
+#     return SecretToASecret(k, True)
 
 ###################################### test_crypto ##############################
 
@@ -2756,26 +2871,24 @@ def test_crypto():
     addr_c = public_key_to_bc_address(pubkey_c)
     addr_u = public_key_to_bc_address(pubkey_u)
 
-    print "Private key            ", '%064x'%pvk
-    print "Compressed public key  ", pubkey_c.encode('hex')
-    print "Uncompressed public key", pubkey_u.encode('hex')
+    print("Private key            ", '%064x'%pvk)
+    print("Compressed public key  ", bytes_to_hex_string(pubkey_c))
+    print("Uncompressed public key", bytes_to_hex_string(pubkey_u))
 
     message = "Chancellor on brink of second bailout for banks"
     enc = EC_KEY.encrypt_message(message,pubkey_c)
     eck = EC_KEY(number_to_string(pvk,_r))
     dec = eck.decrypt_message(enc)
-    print "decrypted", dec
+    print("decrypted", dec)
 
     signature = eck.sign_message(message, True, addr_c)
-    print signature
+    print(signature)
     EC_KEY.verify_message(addr_c, signature, message)
     
 ###################################### KEYTREE ##############################
 
-import sys
 import binascii
 import getpass
-
 """
 You can specify all options at once with the no prompt option. But it is discouraged because on most OS commands are stored in a history file:
 ./kt.py --noprompt -s "this is a password" --chain "(0-1)'/(6-8)'" -trav levelorder
@@ -2847,13 +2960,13 @@ DEFAULTTREETRAVERSALTYPE = TreeTraversal.PREORDER
 
 
 class KeyTreeUtil(object):
-    NODE_IDX_M_FLAG = sys.maxint
+    NODE_IDX_M_FLAG = sys.maxsize
     MASTER_NODE_LOWERCASE_M = "m"
     LEAD_CHAIN_PATH = "___"
 
     @staticmethod
     def sha256Rounds(data, rounds):
-        for i in xrange(rounds):
+        for i in range(rounds):
             data = sha256(data)
         return data
 
@@ -2932,7 +3045,7 @@ class KeyTreeUtil(object):
 
     @staticmethod
     def compressedPubKeyToUncompressedPubKey(compressedPubKey):
-        compressedPubKey = compressedPubKey.encode('hex')
+        compressedPubKey = bytes_to_hex_string(compressedPubKey)
 
         p = 0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f
         y_parity = int(compressedPubKey[:2]) - 2
@@ -3002,7 +3115,7 @@ class BIP39(object):
             )
         h = hashlib.sha256(data).hexdigest()
         b = (
-            bin(int(binascii.hexlify(data), 16))[2:].zfill(len(data) * 8)
+            bin(int(safe_hexlify(data), 16))[2:].zfill(len(data) * 8)
             + bin(int(h, 16))[2:].zfill(256)[: len(data) * 8 // 32]
         )
         result = []
@@ -3067,15 +3180,14 @@ class KeyNode(object):
             raise ValueError("Invalid extended key length.")
 
         self.version = extKey[0:4]
-        self.depth = extKey[4]
+        self.depth = from_int_to_byte(from_byte_to_int(extKey[4]))
         self.parent_fp = extKey[5:9]
         self.child_num = extKey[9:13]
         self.chain_code = extKey[13:45]
         self.key = extKey[45:78]
-
-        self.version = int(self.version.encode('hex'), 16)
-        self.depth = int(self.depth.encode('hex'), 16)
-        self.child_num = int(self.child_num.encode('hex'), 16)
+        self.version = int(bytes_to_hex_string(self.version), 16)
+        self.depth = int(bytes_to_hex_string(self.depth), 16)
+        self.child_num = int(bytes_to_hex_string(self.child_num), 16)
 
         if self.isPrivate():
             if self.version != KeyNode.priv_version:
@@ -3118,7 +3230,7 @@ class KeyNode(object):
             return self.pubkey
 
     def isPrivate(self):
-        return len(self.key) == 33 and int(self.key[0].encode('hex'), 16) == 0x00
+        return len(self.key) == 33 and from_byte_to_int(self.key[0]) == 0x00
 
     def getFingerPrint(self):
         return hash_160(self.pubkey_compressed)[:4]
@@ -3156,7 +3268,7 @@ class KeyNode(object):
         if self.isPrivate():
             child.key, child.chain_code = CKD(self.key[1:], self.chain_code, i)
             # pad with 0's to make it 33 bytes
-            zeroPadding = '\00'*(33 - len(child.key))
+            zeroPadding = b'\00'*(33 - len(child.key))
             child.key = zeroPadding + child.key
             child.pubkey, child.pubkey_compressed = get_pubkeys_from_secret(child.key[1:])
         else:
@@ -3171,15 +3283,15 @@ class KeyNode(object):
 
     def getPubKey(self, compressed):
         if compressed:
-            return self.pubkey_compressed.encode('hex')
+            return bytes_to_hex_string(self.pubkey_compressed)
         else:
-            return ('\04' + self.pubkey).encode('hex')
+            return bytes_to_hex_string((b'\04' + self.pubkey))
 
     def getAddress(self, compressed):
         if compressed:
             return hash_160_to_bc_address(hash_160(self.pubkey_compressed), KeyNode.addr_type)
         else:
-            return hash_160_to_bc_address(hash_160('\04' + self.pubkey), KeyNode.addr_type)
+            return hash_160_to_bc_address(hash_160(b'\04' + self.pubkey), KeyNode.addr_type)
 
     def getExtKey(self):
         depthBytes = safe_from_hex(format(self.depth, '#04x')[2:])
@@ -3223,45 +3335,45 @@ class TestKeyTree(unittest.TestCase):
       keyNode = KeyNode(key = k, chain_code = c)
 
       keyNodePub = keyNode.getPublic()
-      self.assertEquals(keyNodePub.getExtKey(), 'xpub661MyMwAqRbcFtXgS5sYJABqqG9YLmC4Q1Rdap9gSE8NqtwybGhePY2gZ29ESFjqJoCu1Rupje8YtGqsefD265TMg7usUDFdp6W1EGMcet8')
-      self.assertEquals(keyNode.getExtKey(), 'xprv9s21ZrQH143K3QTDL4LXw2F7HEK3wJUD2nW2nRk4stbPy6cq3jPPqjiChkVvvNKmPGJxWUtg6LnF5kejMRNNU3TGtRBeJgk33yuGBxrMPHi')
-      self.assertEquals(keyNode.getPrivKey(True), 'L52XzL2cMkHxqxBXRyEpnPQZGUs3uKiL3R11XbAdHigRzDozKZeW')
-      self.assertEquals(keyNode.getAddress(True), '15mKKb2eos1hWa6tisdPwwDC1a5J1y9nma')
+      self.assertEqual(keyNodePub.getExtKey(), 'xpub661MyMwAqRbcFtXgS5sYJABqqG9YLmC4Q1Rdap9gSE8NqtwybGhePY2gZ29ESFjqJoCu1Rupje8YtGqsefD265TMg7usUDFdp6W1EGMcet8')
+      self.assertEqual(keyNode.getExtKey(), 'xprv9s21ZrQH143K3QTDL4LXw2F7HEK3wJUD2nW2nRk4stbPy6cq3jPPqjiChkVvvNKmPGJxWUtg6LnF5kejMRNNU3TGtRBeJgk33yuGBxrMPHi')
+      self.assertEqual(keyNode.getPrivKey(True), 'L52XzL2cMkHxqxBXRyEpnPQZGUs3uKiL3R11XbAdHigRzDozKZeW')
+      self.assertEqual(keyNode.getAddress(True), '15mKKb2eos1hWa6tisdPwwDC1a5J1y9nma')
 
       keyNode = keyNode.getChild(KeyTreeUtil.toPrime(0))
       keyNodePub = keyNode.getPublic()
-      self.assertEquals(keyNodePub.getExtKey(), 'xpub68Gmy5EdvgibQVfPdqkBBCHxA5htiqg55crXYuXoQRKfDBFA1WEjWgP6LHhwBZeNK1VTsfTFUHCdrfp1bgwQ9xv5ski8PX9rL2dZXvgGDnw')
-      self.assertEquals(keyNode.getExtKey(), 'xprv9uHRZZhk6KAJC1avXpDAp4MDc3sQKNxDiPvvkX8Br5ngLNv1TxvUxt4cV1rGL5hj6KCesnDYUhd7oWgT11eZG7XnxHrnYeSvkzY7d2bhkJ7')
-      self.assertEquals(keyNode.getPrivKey(True), 'L5BmPijJjrKbiUfG4zbiFKNqkvuJ8usooJmzuD7Z8dkRoTThYnAT')
-      self.assertEquals(keyNode.getAddress(True), '19Q2WoS5hSS6T8GjhK8KZLMgmWaq4neXrh')
+      self.assertEqual(keyNodePub.getExtKey(), 'xpub68Gmy5EdvgibQVfPdqkBBCHxA5htiqg55crXYuXoQRKfDBFA1WEjWgP6LHhwBZeNK1VTsfTFUHCdrfp1bgwQ9xv5ski8PX9rL2dZXvgGDnw')
+      self.assertEqual(keyNode.getExtKey(), 'xprv9uHRZZhk6KAJC1avXpDAp4MDc3sQKNxDiPvvkX8Br5ngLNv1TxvUxt4cV1rGL5hj6KCesnDYUhd7oWgT11eZG7XnxHrnYeSvkzY7d2bhkJ7')
+      self.assertEqual(keyNode.getPrivKey(True), 'L5BmPijJjrKbiUfG4zbiFKNqkvuJ8usooJmzuD7Z8dkRoTThYnAT')
+      self.assertEqual(keyNode.getAddress(True), '19Q2WoS5hSS6T8GjhK8KZLMgmWaq4neXrh')
 
       keyNode = keyNode.getChild(1)
       keyNodePub = keyNode.getPublic()
-      self.assertEquals(keyNodePub.getExtKey(), 'xpub6ASuArnXKPbfEwhqN6e3mwBcDTgzisQN1wXN9BJcM47sSikHjJf3UFHKkNAWbWMiGj7Wf5uMash7SyYq527Hqck2AxYysAA7xmALppuCkwQ')
-      self.assertEquals(keyNode.getExtKey(), 'xprv9wTYmMFdV23N2TdNG573QoEsfRrWKQgWeibmLntzniatZvR9BmLnvSxqu53Kw1UmYPxLgboyZQaXwTCg8MSY3H2EU4pWcQDnRnrVA1xe8fs')
-      self.assertEquals(keyNode.getPrivKey(True), 'KyFAjQ5rgrKvhXvNMtFB5PCSKUYD1yyPEe3xr3T34TZSUHycXtMM')
-      self.assertEquals(keyNode.getAddress(True), '1JQheacLPdM5ySCkrZkV66G2ApAXe1mqLj')
+      self.assertEqual(keyNodePub.getExtKey(), 'xpub6ASuArnXKPbfEwhqN6e3mwBcDTgzisQN1wXN9BJcM47sSikHjJf3UFHKkNAWbWMiGj7Wf5uMash7SyYq527Hqck2AxYysAA7xmALppuCkwQ')
+      self.assertEqual(keyNode.getExtKey(), 'xprv9wTYmMFdV23N2TdNG573QoEsfRrWKQgWeibmLntzniatZvR9BmLnvSxqu53Kw1UmYPxLgboyZQaXwTCg8MSY3H2EU4pWcQDnRnrVA1xe8fs')
+      self.assertEqual(keyNode.getPrivKey(True), 'KyFAjQ5rgrKvhXvNMtFB5PCSKUYD1yyPEe3xr3T34TZSUHycXtMM')
+      self.assertEqual(keyNode.getAddress(True), '1JQheacLPdM5ySCkrZkV66G2ApAXe1mqLj')
 
       keyNode = keyNode.getChild(KeyTreeUtil.toPrime(2))
       keyNodePub = keyNode.getPublic()
-      self.assertEquals(keyNodePub.getExtKey(), 'xpub6D4BDPcP2GT577Vvch3R8wDkScZWzQzMMUm3PWbmWvVJrZwQY4VUNgqFJPMM3No2dFDFGTsxxpG5uJh7n7epu4trkrX7x7DogT5Uv6fcLW5')
-      self.assertEquals(keyNode.getExtKey(), 'xprv9z4pot5VBttmtdRTWfWQmoH1taj2axGVzFqSb8C9xaxKymcFzXBDptWmT7FwuEzG3ryjH4ktypQSAewRiNMjANTtpgP4mLTj34bhnZX7UiM')
-      self.assertEquals(keyNode.getPrivKey(True), 'L43t3od1Gh7Lj55Bzjj1xDAgJDcL7YFo2nEcNaMGiyRZS1CidBVU')
-      self.assertEquals(keyNode.getAddress(True), '1NjxqbA9aZWnh17q1UW3rB4EPu79wDXj7x')
+      self.assertEqual(keyNodePub.getExtKey(), 'xpub6D4BDPcP2GT577Vvch3R8wDkScZWzQzMMUm3PWbmWvVJrZwQY4VUNgqFJPMM3No2dFDFGTsxxpG5uJh7n7epu4trkrX7x7DogT5Uv6fcLW5')
+      self.assertEqual(keyNode.getExtKey(), 'xprv9z4pot5VBttmtdRTWfWQmoH1taj2axGVzFqSb8C9xaxKymcFzXBDptWmT7FwuEzG3ryjH4ktypQSAewRiNMjANTtpgP4mLTj34bhnZX7UiM')
+      self.assertEqual(keyNode.getPrivKey(True), 'L43t3od1Gh7Lj55Bzjj1xDAgJDcL7YFo2nEcNaMGiyRZS1CidBVU')
+      self.assertEqual(keyNode.getAddress(True), '1NjxqbA9aZWnh17q1UW3rB4EPu79wDXj7x')
 
       keyNode = keyNode.getChild(2)
       keyNodePub = keyNode.getPublic()
-      self.assertEquals(keyNodePub.getExtKey(), 'xpub6FHa3pjLCk84BayeJxFW2SP4XRrFd1JYnxeLeU8EqN3vDfZmbqBqaGJAyiLjTAwm6ZLRQUMv1ZACTj37sR62cfN7fe5JnJ7dh8zL4fiyLHV')
-      self.assertEquals(keyNode.getExtKey(), 'xprvA2JDeKCSNNZky6uBCviVfJSKyQ1mDYahRjijr5idH2WwLsEd4Hsb2Tyh8RfQMuPh7f7RtyzTtdrbdqqsunu5Mm3wDvUAKRHSC34sJ7in334')
-      self.assertEquals(keyNode.getPrivKey(True), 'KwjQsVuMjbCP2Zmr3VaFaStav7NvevwjvvkqrWd5Qmh1XVnCteBR')
-      self.assertEquals(keyNode.getAddress(True), '1LjmJcdPnDHhNTUgrWyhLGnRDKxQjoxAgt')
+      self.assertEqual(keyNodePub.getExtKey(), 'xpub6FHa3pjLCk84BayeJxFW2SP4XRrFd1JYnxeLeU8EqN3vDfZmbqBqaGJAyiLjTAwm6ZLRQUMv1ZACTj37sR62cfN7fe5JnJ7dh8zL4fiyLHV')
+      self.assertEqual(keyNode.getExtKey(), 'xprvA2JDeKCSNNZky6uBCviVfJSKyQ1mDYahRjijr5idH2WwLsEd4Hsb2Tyh8RfQMuPh7f7RtyzTtdrbdqqsunu5Mm3wDvUAKRHSC34sJ7in334')
+      self.assertEqual(keyNode.getPrivKey(True), 'KwjQsVuMjbCP2Zmr3VaFaStav7NvevwjvvkqrWd5Qmh1XVnCteBR')
+      self.assertEqual(keyNode.getAddress(True), '1LjmJcdPnDHhNTUgrWyhLGnRDKxQjoxAgt')
 
       keyNode = keyNode.getChild(1000000000)
       keyNodePub = keyNode.getPublic()
-      self.assertEquals(keyNodePub.getExtKey(), 'xpub6H1LXWLaKsWFhvm6RVpEL9P4KfRZSW7abD2ttkWP3SSQvnyA8FSVqNTEcYFgJS2UaFcxupHiYkro49S8yGasTvXEYBVPamhGW6cFJodrTHy')
-      self.assertEquals(keyNode.getExtKey(), 'xprvA41z7zogVVwxVSgdKUHDy1SKmdb533PjDz7J6N6mV6uS3ze1ai8FHa8kmHScGpWmj4WggLyQjgPie1rFSruoUihUZREPSL39UNdE3BBDu76')
-      self.assertEquals(keyNode.getPrivKey(True), 'Kybw8izYevo5xMh1TK7aUr7jHFCxXS1zv8p3oqFz3o2zFbhRXHYs')
-      self.assertEquals(keyNode.getAddress(True), '1LZiqrop2HGR4qrH1ULZPyBpU6AUP49Uam')
+      self.assertEqual(keyNodePub.getExtKey(), 'xpub6H1LXWLaKsWFhvm6RVpEL9P4KfRZSW7abD2ttkWP3SSQvnyA8FSVqNTEcYFgJS2UaFcxupHiYkro49S8yGasTvXEYBVPamhGW6cFJodrTHy')
+      self.assertEqual(keyNode.getExtKey(), 'xprvA41z7zogVVwxVSgdKUHDy1SKmdb533PjDz7J6N6mV6uS3ze1ai8FHa8kmHScGpWmj4WggLyQjgPie1rFSruoUihUZREPSL39UNdE3BBDu76')
+      self.assertEqual(keyNode.getPrivKey(True), 'Kybw8izYevo5xMh1TK7aUr7jHFCxXS1zv8p3oqFz3o2zFbhRXHYs')
+      self.assertEqual(keyNode.getAddress(True), '1LZiqrop2HGR4qrH1ULZPyBpU6AUP49Uam')
 
     def testVector2(self):
       seedHexStr = "fffcf9f6f3f0edeae7e4e1dedbd8d5d2cfccc9c6c3c0bdbab7b4b1aeaba8a5a29f9c999693908d8a8784817e7b7875726f6c696663605d5a5754514e4b484542"
@@ -3271,51 +3383,51 @@ class TestKeyTree(unittest.TestCase):
       keyNode = KeyNode(key = k, chain_code = c)
 
       keyNodePub = keyNode.getPublic()
-      self.assertEquals(keyNodePub.getExtKey(), 'xpub661MyMwAqRbcFW31YEwpkMuc5THy2PSt5bDMsktWQcFF8syAmRUapSCGu8ED9W6oDMSgv6Zz8idoc4a6mr8BDzTJY47LJhkJ8UB7WEGuduB')
-      self.assertEquals(keyNode.getExtKey(), 'xprv9s21ZrQH143K31xYSDQpPDxsXRTUcvj2iNHm5NUtrGiGG5e2DtALGdso3pGz6ssrdK4PFmM8NSpSBHNqPqm55Qn3LqFtT2emdEXVYsCzC2U')
-      self.assertEquals(keyNode.getPrivKey(True), 'KyjXhyHF9wTphBkfpxjL8hkDXDUSbE3tKANT94kXSyh6vn6nKaoy')
-      self.assertEquals(keyNode.getAddress(True), '1JEoxevbLLG8cVqeoGKQiAwoWbNYSUyYjg')
+      self.assertEqual(keyNodePub.getExtKey(), 'xpub661MyMwAqRbcFW31YEwpkMuc5THy2PSt5bDMsktWQcFF8syAmRUapSCGu8ED9W6oDMSgv6Zz8idoc4a6mr8BDzTJY47LJhkJ8UB7WEGuduB')
+      self.assertEqual(keyNode.getExtKey(), 'xprv9s21ZrQH143K31xYSDQpPDxsXRTUcvj2iNHm5NUtrGiGG5e2DtALGdso3pGz6ssrdK4PFmM8NSpSBHNqPqm55Qn3LqFtT2emdEXVYsCzC2U')
+      self.assertEqual(keyNode.getPrivKey(True), 'KyjXhyHF9wTphBkfpxjL8hkDXDUSbE3tKANT94kXSyh6vn6nKaoy')
+      self.assertEqual(keyNode.getAddress(True), '1JEoxevbLLG8cVqeoGKQiAwoWbNYSUyYjg')
 
       keyNode = keyNode.getChild(0)
       keyNodePub = keyNode.getPublic()
-      self.assertEquals(keyNodePub.getExtKey(), 'xpub69H7F5d8KSRgmmdJg2KhpAK8SR3DjMwAdkxj3ZuxV27CprR9LgpeyGmXUbC6wb7ERfvrnKZjXoUmmDznezpbZb7ap6r1D3tgFxHmwMkQTPH')
-      self.assertEquals(keyNode.getExtKey(), 'xprv9vHkqa6EV4sPZHYqZznhT2NPtPCjKuDKGY38FBWLvgaDx45zo9WQRUT3dKYnjwih2yJD9mkrocEZXo1ex8G81dwSM1fwqWpWkeS3v86pgKt')
-      self.assertEquals(keyNode.getPrivKey(True), 'L2ysLrR6KMSAtx7uPqmYpoTeiRzydXBattRXjXz5GDFPrdfPzKbj')
-      self.assertEquals(keyNode.getAddress(True), '19EuDJdgfRkwCmRzbzVBHZWQG9QNWhftbZ')
+      self.assertEqual(keyNodePub.getExtKey(), 'xpub69H7F5d8KSRgmmdJg2KhpAK8SR3DjMwAdkxj3ZuxV27CprR9LgpeyGmXUbC6wb7ERfvrnKZjXoUmmDznezpbZb7ap6r1D3tgFxHmwMkQTPH')
+      self.assertEqual(keyNode.getExtKey(), 'xprv9vHkqa6EV4sPZHYqZznhT2NPtPCjKuDKGY38FBWLvgaDx45zo9WQRUT3dKYnjwih2yJD9mkrocEZXo1ex8G81dwSM1fwqWpWkeS3v86pgKt')
+      self.assertEqual(keyNode.getPrivKey(True), 'L2ysLrR6KMSAtx7uPqmYpoTeiRzydXBattRXjXz5GDFPrdfPzKbj')
+      self.assertEqual(keyNode.getAddress(True), '19EuDJdgfRkwCmRzbzVBHZWQG9QNWhftbZ')
 
       keyNode = keyNode.getChild(KeyTreeUtil.toPrime(2147483647))
       keyNodePub = keyNode.getPublic()
-      self.assertEquals(keyNodePub.getExtKey(), 'xpub6ASAVgeehLbnwdqV6UKMHVzgqAG8Gr6riv3Fxxpj8ksbH9ebxaEyBLZ85ySDhKiLDBrQSARLq1uNRts8RuJiHjaDMBU4Zn9h8LZNnBC5y4a')
-      self.assertEquals(keyNode.getExtKey(), 'xprv9wSp6B7kry3Vj9m1zSnLvN3xH8RdsPP1Mh7fAaR7aRLcQMKTR2vidYEeEg2mUCTAwCd6vnxVrcjfy2kRgVsFawNzmjuHc2YmYRmagcEPdU9')
-      self.assertEquals(keyNode.getPrivKey(True), 'L1m5VpbXmMp57P3knskwhoMTLdhAAaXiHvnGLMribbfwzVRpz2Sr')
-      self.assertEquals(keyNode.getAddress(True), '1Lke9bXGhn5VPrBuXgN12uGUphrttUErmk')
+      self.assertEqual(keyNodePub.getExtKey(), 'xpub6ASAVgeehLbnwdqV6UKMHVzgqAG8Gr6riv3Fxxpj8ksbH9ebxaEyBLZ85ySDhKiLDBrQSARLq1uNRts8RuJiHjaDMBU4Zn9h8LZNnBC5y4a')
+      self.assertEqual(keyNode.getExtKey(), 'xprv9wSp6B7kry3Vj9m1zSnLvN3xH8RdsPP1Mh7fAaR7aRLcQMKTR2vidYEeEg2mUCTAwCd6vnxVrcjfy2kRgVsFawNzmjuHc2YmYRmagcEPdU9')
+      self.assertEqual(keyNode.getPrivKey(True), 'L1m5VpbXmMp57P3knskwhoMTLdhAAaXiHvnGLMribbfwzVRpz2Sr')
+      self.assertEqual(keyNode.getAddress(True), '1Lke9bXGhn5VPrBuXgN12uGUphrttUErmk')
 
       keyNode = keyNode.getChild(1)
       keyNodePub = keyNode.getPublic()
-      self.assertEquals(keyNodePub.getExtKey(), 'xpub6DF8uhdarytz3FWdA8TvFSvvAh8dP3283MY7p2V4SeE2wyWmG5mg5EwVvmdMVCQcoNJxGoWaU9DCWh89LojfZ537wTfunKau47EL2dhHKon')
-      self.assertEquals(keyNode.getExtKey(), 'xprv9zFnWC6h2cLgpmSA46vutJzBcfJ8yaJGg8cX1e5StJh45BBciYTRXSd25UEPVuesF9yog62tGAQtHjXajPPdbRCHuWS6T8XA2ECKADdw4Ef')
-      self.assertEquals(keyNode.getPrivKey(True), 'KzyzXnznxSv249b4KuNkBwowaN3akiNeEHy5FWoPCJpStZbEKXN2')
-      self.assertEquals(keyNode.getAddress(True), '1BxrAr2pHpeBheusmd6fHDP2tSLAUa3qsW')
+      self.assertEqual(keyNodePub.getExtKey(), 'xpub6DF8uhdarytz3FWdA8TvFSvvAh8dP3283MY7p2V4SeE2wyWmG5mg5EwVvmdMVCQcoNJxGoWaU9DCWh89LojfZ537wTfunKau47EL2dhHKon')
+      self.assertEqual(keyNode.getExtKey(), 'xprv9zFnWC6h2cLgpmSA46vutJzBcfJ8yaJGg8cX1e5StJh45BBciYTRXSd25UEPVuesF9yog62tGAQtHjXajPPdbRCHuWS6T8XA2ECKADdw4Ef')
+      self.assertEqual(keyNode.getPrivKey(True), 'KzyzXnznxSv249b4KuNkBwowaN3akiNeEHy5FWoPCJpStZbEKXN2')
+      self.assertEqual(keyNode.getAddress(True), '1BxrAr2pHpeBheusmd6fHDP2tSLAUa3qsW')
 
       keyNode = keyNode.getChild(KeyTreeUtil.toPrime(2147483646))
       keyNodePub = keyNode.getPublic()
-      self.assertEquals(keyNodePub.getExtKey(), 'xpub6ERApfZwUNrhLCkDtcHTcxd75RbzS1ed54G1LkBUHQVHQKqhMkhgbmJbZRkrgZw4koxb5JaHWkY4ALHY2grBGRjaDMzQLcgJvLJuZZvRcEL')
-      self.assertEquals(keyNode.getExtKey(), 'xprvA1RpRA33e1JQ7ifknakTFpgNXPmW2YvmhqLQYMmrj4xJXXWYpDPS3xz7iAxn8L39njGVyuoseXzU6rcxFLJ8HFsTjSyQbLYnMpCqE2VbFWc')
-      self.assertEquals(keyNode.getPrivKey(True), 'L5KhaMvPYRW1ZoFmRjUtxxPypQ94m6BcDrPhqArhggdaTbbAFJEF')
-      self.assertEquals(keyNode.getAddress(True), '15XVotxCAV7sRx1PSCkQNsGw3W9jT9A94R')
+      self.assertEqual(keyNodePub.getExtKey(), 'xpub6ERApfZwUNrhLCkDtcHTcxd75RbzS1ed54G1LkBUHQVHQKqhMkhgbmJbZRkrgZw4koxb5JaHWkY4ALHY2grBGRjaDMzQLcgJvLJuZZvRcEL')
+      self.assertEqual(keyNode.getExtKey(), 'xprvA1RpRA33e1JQ7ifknakTFpgNXPmW2YvmhqLQYMmrj4xJXXWYpDPS3xz7iAxn8L39njGVyuoseXzU6rcxFLJ8HFsTjSyQbLYnMpCqE2VbFWc')
+      self.assertEqual(keyNode.getPrivKey(True), 'L5KhaMvPYRW1ZoFmRjUtxxPypQ94m6BcDrPhqArhggdaTbbAFJEF')
+      self.assertEqual(keyNode.getAddress(True), '15XVotxCAV7sRx1PSCkQNsGw3W9jT9A94R')
 
       keyNode = keyNode.getChild(2)
       keyNodePub = keyNode.getPublic()
-      self.assertEquals(keyNodePub.getExtKey(), 'xpub6FnCn6nSzZAw5Tw7cgR9bi15UV96gLZhjDstkXXxvCLsUXBGXPdSnLFbdpq8p9HmGsApME5hQTZ3emM2rnY5agb9rXpVGyy3bdW6EEgAtqt')
-      self.assertEquals(keyNode.getExtKey(), 'xprvA2nrNbFZABcdryreWet9Ea4LvTJcGsqrMzxHx98MMrotbir7yrKCEXw7nadnHM8Dq38EGfSh6dqA9QWTyefMLEcBYJUuekgW4BYPJcr9E7j')
-      self.assertEquals(keyNode.getPrivKey(True), 'L3WAYNAZPxx1fr7KCz7GN9nD5qMBnNiqEJNJMU1z9MMaannAt4aK')
-      self.assertEquals(keyNode.getAddress(True), '14UKfRV9ZPUp6ZC9PLhqbRtxdihW9em3xt')
+      self.assertEqual(keyNodePub.getExtKey(), 'xpub6FnCn6nSzZAw5Tw7cgR9bi15UV96gLZhjDstkXXxvCLsUXBGXPdSnLFbdpq8p9HmGsApME5hQTZ3emM2rnY5agb9rXpVGyy3bdW6EEgAtqt')
+      self.assertEqual(keyNode.getExtKey(), 'xprvA2nrNbFZABcdryreWet9Ea4LvTJcGsqrMzxHx98MMrotbir7yrKCEXw7nadnHM8Dq38EGfSh6dqA9QWTyefMLEcBYJUuekgW4BYPJcr9E7j')
+      self.assertEqual(keyNode.getPrivKey(True), 'L3WAYNAZPxx1fr7KCz7GN9nD5qMBnNiqEJNJMU1z9MMaannAt4aK')
+      self.assertEqual(keyNode.getAddress(True), '14UKfRV9ZPUp6ZC9PLhqbRtxdihW9em3xt')
 
     def testBIP39AndBIP44_1(self):
       mnemonic = 'pilot dolphin motion portion survey sock turkey afford destroy knee sock sibling'
       seedHexStr = '936ae011512b96e7ce3ff05d464e3801834d023249baabfebfe13e593dc33610ea68279c271df6bab7cfbea8bbcf470e050fe6589f552f7e1f6c80432c7bcc57'
-      self.assertEquals(BIP39.phraseIsValid(mnemonic), True)
-      self.assertEquals(binascii.hexlify(BIP39.getMasterHex(mnemonic)), seedHexStr)
+      self.assertEqual(BIP39.phraseIsValid(mnemonic), True)
+      self.assertEqual(safe_hexlify(BIP39.getMasterHex(mnemonic)), seedHexStr)
 
       master_secret, master_chain, master_public_key, master_public_key_compressed = bip32_init(seedHexStr)
       k = master_secret
@@ -3327,56 +3439,89 @@ class TestKeyTree(unittest.TestCase):
       # "44'/0'/0'
       keyNodeBIP44Account0 = keyNode.getChild(KeyTreeUtil.toPrime(44)).getChild(KeyTreeUtil.toPrime(0)).getChild(KeyTreeUtil.toPrime(0))
       keyNodePubkeyNodeBIP44Account0 = keyNodeBIP44Account0.getPublic()
-      self.assertEquals(keyNodePubkeyNodeBIP44Account0.getExtKey(), 'xpub6C8GhTSMvJj3sxXBn2MExN2gNNNheLcp6n82KW2cPbvrMPAB9ph7REGW3NCb1SYVkV8B2Jkkg3YH9k1n9wvV8BdBq87hTHDP9rAo1ajg2zi')
-      self.assertEquals(keyNodeBIP44Account0.getExtKey(), 'xprv9y8vHwuU5wAkfUSifzpEbE5wpLYDEstxjZCRX7czqGPsUaq2cHNrsRx2C4zdbcLguGqsAeJQ82kxnEXcwsYr859mLmd8Z619aAjmoaarJYr')
+      self.assertEqual(keyNodePubkeyNodeBIP44Account0.getExtKey(), 'xpub6C8GhTSMvJj3sxXBn2MExN2gNNNheLcp6n82KW2cPbvrMPAB9ph7REGW3NCb1SYVkV8B2Jkkg3YH9k1n9wvV8BdBq87hTHDP9rAo1ajg2zi')
+      self.assertEqual(keyNodeBIP44Account0.getExtKey(), 'xprv9y8vHwuU5wAkfUSifzpEbE5wpLYDEstxjZCRX7czqGPsUaq2cHNrsRx2C4zdbcLguGqsAeJQ82kxnEXcwsYr859mLmd8Z619aAjmoaarJYr')
 
       k = keyNodeBIP44Account0.getChild(0).getChild(0)
       # "44'/0'/0'/0/0
-      self.assertEquals(k.getPrivKey(True), 'KxCM9pZVYWQ1KVhsgqs3ityzC6ix934uR4XXurzo2rm2qPhZNCb7')
-      self.assertEquals(k.getAddress(True), '141Cx3X4fy22kBCprmQaFSbEz8R7bPtY6r')
+      self.assertEqual(k.getPrivKey(True), 'KxCM9pZVYWQ1KVhsgqs3ityzC6ix934uR4XXurzo2rm2qPhZNCb7')
+      self.assertEqual(k.getAddress(True), '141Cx3X4fy22kBCprmQaFSbEz8R7bPtY6r')
+      self.assertEqual(k.getPubKey(True), '039dfdf237c90bc58d4a00810fea1881c146ada2b0b5a24a9058587d5a5f7ee56b')
+      self.assertEqual(k.getPrivKey(False), '5J37qDb6ZWmdmyM8rosJqTjN7bNjrQ8EEcEiSa5V6rnmpiozgj7')
+      self.assertEqual(k.getAddress(False), '193CmiHk68uvwBm3EWzUT9xBwEV5axRLRc')
+      self.assertEqual(k.getPubKey(False), '049dfdf237c90bc58d4a00810fea1881c146ada2b0b5a24a9058587d5a5f7ee56b6f7f197628446e66f048920b1e2ecba96f209120a7cdc9965fc920d2103b8fb1')
       k = keyNodeBIP44Account0.getChild(0).getChild(1)
       # "44'/0'/0'/0/1
-      self.assertEquals(k.getPrivKey(True), 'Kz5JBbALpaf8GmopZSVXqoCvJ42NWBf16jCZaJG7rzuqCARpnjYy')
-      self.assertEquals(k.getAddress(True), '1ARLhiAbSZNC9vv8R1AB5cbc6aWQEpNXJ6')
+      self.assertEqual(k.getPrivKey(True), 'Kz5JBbALpaf8GmopZSVXqoCvJ42NWBf16jCZaJG7rzuqCARpnjYy')
+      self.assertEqual(k.getAddress(True), '1ARLhiAbSZNC9vv8R1AB5cbc6aWQEpNXJ6')
+      self.assertEqual(k.getPubKey(True), '022742251a2cabaf82c647641481b00e8c6c8c74134046c881ab76af5191baaffd')
+      self.assertEqual(k.getPrivKey(False), '5JToVEBGpV1wDBc5S2FAhxnJ4Qo5RHTjcje4JWjr8hm9CcxZrEr')
+      self.assertEqual(k.getAddress(False), '17n9XZTpSuyLBrLboh1v9Hx4c9tyVreFJp')
+      self.assertEqual(k.getPubKey(False), '042742251a2cabaf82c647641481b00e8c6c8c74134046c881ab76af5191baaffd6b369b7c88db765b920039b447817b82c53e7ae6ad75465e249a7a0f61f35f56')
 
       k = keyNodeBIP44Account0.getChild(1).getChild(0)
       # "44'/0'/0'/1/0
-      self.assertEquals(k.getPrivKey(True), 'L43BWnRwRrq6cSMECCqALAT9M1rGZxQNr64WcRGyGQUaysC9vTYW')
-      self.assertEquals(k.getAddress(True), '12e3sfXMoZ2afB8sxTSKyiQgu9cZtzvxHa')
+      self.assertEqual(k.getPrivKey(True), 'L43BWnRwRrq6cSMECCqALAT9M1rGZxQNr64WcRGyGQUaysC9vTYW')
+      self.assertEqual(k.getAddress(True), '12e3sfXMoZ2afB8sxTSKyiQgu9cZtzvxHa')
+      self.assertEqual(k.getPubKey(True), '03638f7c478e63deae7200a474d10b5519d0352898c37b3a66aa365578930ce20c')
+      self.assertEqual(k.getPrivKey(False), '5KMtKXgdoQyfRo58XBPEtvLyGQknfjTbQMdbMG1uAqNCn4Uu7s4')
+      self.assertEqual(k.getAddress(False), '1GtKGcMKckcQCJpN1DqKhYN4eKNgm2AwD2')
+      self.assertEqual(k.getPubKey(False), '04638f7c478e63deae7200a474d10b5519d0352898c37b3a66aa365578930ce20c8048261edf4b86af1a7053fd84826cbcbe95cd5dc33c04c9ef82656cac8ccc19')
       k = keyNodeBIP44Account0.getChild(1).getChild(1)
       # "44'/0'/0'/1/1
-      self.assertEquals(k.getPrivKey(True), 'Kz59nEqpedMQxM4oi5zYSQcF3a7rksCVnh4agonXXRRdUxRBeXzr')
-      self.assertEquals(k.getAddress(True), '1JB6H4KxgGbnYiNNxuHHqhddyPqCbBvtLX')
+      self.assertEqual(k.getPrivKey(True), 'Kz59nEqpedMQxM4oi5zYSQcF3a7rksCVnh4agonXXRRdUxRBeXzr')
+      self.assertEqual(k.getAddress(True), '1JB6H4KxgGbnYiNNxuHHqhddyPqCbBvtLX')
+      self.assertEqual(k.getPubKey(True), '03fcbe014cab36a7c2a4d0babfd8185de0e7cabe5b4e5158f2ba6d1066a5210f73')
+      self.assertEqual(k.getPrivKey(False), '5JTmap6AtaAA42Nhwd2Fpu2BtLHWQ5aRCFy6NFgKF9FeGTJWKuN')
+      self.assertEqual(k.getAddress(False), '17A9hhFSsrC6JEYgjiCni7H4UDwewDNZRK')
+      self.assertEqual(k.getPubKey(False), '04fcbe014cab36a7c2a4d0babfd8185de0e7cabe5b4e5158f2ba6d1066a5210f734e9985a9d1ab4b5ae240b23b82b48e0acf18a8babcbcf4ec89872dacec0b6b49')
 
       # "44'/0'/1'
       keyNodeBIP44Account1 = keyNode.getChild(KeyTreeUtil.toPrime(44)).getChild(KeyTreeUtil.toPrime(0)).getChild(KeyTreeUtil.toPrime(1))
       keyNodePubkeyNodeBIP44Account1 = keyNodeBIP44Account1.getPublic()
-      self.assertEquals(keyNodePubkeyNodeBIP44Account1.getExtKey(), 'xpub6C8GhTSMvJj3xRbmbq6uneY49PHP9qBm8pRRv2G4FZHLwWdhTE6Gv1BqpYrL4jCWNB3K7yYCEYxn1TTC7dT749nftPCD8BFnPPNQxi5T2oo')
-      self.assertEquals(keyNodeBIP44Account1.getExtKey(), 'xprv9y8vHwuU5wAkjwXJVoZuRWbKbMStkNTumbVq7drShDkN4iJYugn2NCsMyGqfibc9wyQk9bpZdS2D4wtFHVi2jGB6TcJTA34oJUfJYKZ37XU')
+      self.assertEqual(keyNodePubkeyNodeBIP44Account1.getExtKey(), 'xpub6C8GhTSMvJj3xRbmbq6uneY49PHP9qBm8pRRv2G4FZHLwWdhTE6Gv1BqpYrL4jCWNB3K7yYCEYxn1TTC7dT749nftPCD8BFnPPNQxi5T2oo')
+      self.assertEqual(keyNodeBIP44Account1.getExtKey(), 'xprv9y8vHwuU5wAkjwXJVoZuRWbKbMStkNTumbVq7drShDkN4iJYugn2NCsMyGqfibc9wyQk9bpZdS2D4wtFHVi2jGB6TcJTA34oJUfJYKZ37XU')
 
       k = keyNodeBIP44Account1.getChild(0).getChild(0)
       # "44'/0'/1'/0/0
-      self.assertEquals(k.getPrivKey(True), 'L3w3wFQZZTvgYPXn9ep1MJeYfSenTZ86zqivE1V2ijsJ1vSncrdm')
-      self.assertEquals(k.getAddress(True), '1HaPoaEHYSDZjHR18yxm9DRLrkfX8qpXEX')
+      self.assertEqual(k.getPrivKey(True), 'L3w3wFQZZTvgYPXn9ep1MJeYfSenTZ86zqivE1V2ijsJ1vSncrdm')
+      self.assertEqual(k.getAddress(True), '1HaPoaEHYSDZjHR18yxm9DRLrkfX8qpXEX')
+      self.assertEqual(k.getPubKey(True), '0220aa64a35e8f46d94d8acf8f82581e539aa8db34723bf7c00376ccaea9bc06eb')
+      self.assertEqual(k.getPrivKey(False), '5KLVm1YcvaHhE17ySybfbWNeXuwKuguMquGqmBXpWr8mdxWEYrq')
+      self.assertEqual(k.getAddress(False), '1HETVjsvDcjiyiiuHUPVw1TbgNU7KR7gxT')
+      self.assertEqual(k.getPubKey(False), '0420aa64a35e8f46d94d8acf8f82581e539aa8db34723bf7c00376ccaea9bc06eb43867ceaebcdd3360b5187d1e0920d9f8ef28063a466b84b0d732e4f1c45ade4')
       k = keyNodeBIP44Account1.getChild(0).getChild(1)
       # "44'/0'/1'/0/1
-      self.assertEquals(k.getPrivKey(True), 'Kz2EfWsP8toKdbBpdGyrQL3rR83bpLbrqmhpGjotMXnbrvGebsum')
-      self.assertEquals(k.getAddress(True), '18bGTq3Q8AnKwSMFjsuHvG8pVcYJFa6v7A')
+      self.assertEqual(k.getPrivKey(True), 'Kz2EfWsP8toKdbBpdGyrQL3rR83bpLbrqmhpGjotMXnbrvGebsum')
+      self.assertEqual(k.getAddress(True), '18bGTq3Q8AnKwSMFjsuHvG8pVcYJFa6v7A')
+      self.assertEqual(k.getPubKey(True), '02e4ec0fc3919b38acea7a0331fe2720ad89f678ae65922285a7359df3ad25365f')
+      self.assertEqual(k.getPrivKey(False), '5JT7GXL7q1Qdr57z1WuJY7aj1UstPWN3EKHVqReoym8cYJYwJQc')
+      self.assertEqual(k.getAddress(False), '18Pwyap9XdnZrqqqmCskPbCv4ZN3vyLSxU')
+      self.assertEqual(k.getPubKey(False), '04e4ec0fc3919b38acea7a0331fe2720ad89f678ae65922285a7359df3ad25365f4dc76e1f622d554fea1dfa45974ad3330b4770731944b1b59a97309a7a9f6808')
 
       k = keyNodeBIP44Account1.getChild(1).getChild(0)
       # "44'/0'/1'/1/0
-      self.assertEquals(k.getPrivKey(True), 'L1w4DP1b98vaghjsqK7g9vWE4ANkBjfgXfBaKYrS7HofQ4NKombU')
-      self.assertEquals(k.getAddress(True), '1DjZygViqqRRfwwZxK7CssnnpQooAHheuh')
+      self.assertEqual(k.getPrivKey(True), 'L1w4DP1b98vaghjsqK7g9vWE4ANkBjfgXfBaKYrS7HofQ4NKombU')
+      self.assertEqual(k.getAddress(True), '1DjZygViqqRRfwwZxK7CssnnpQooAHheuh')
+      self.assertEqual(k.getPubKey(True), '0368b105d83122aabfcf3c64f20d4b6a4ef280b1aaea82a843ba6c6d7961885427')
+      self.assertEqual(k.getPrivKey(False), '5JtDWYGYJFUzvrZNVAYRH4y1h91rCwyo7Vb7eHHBg2zhRKZXQYo')
+      self.assertEqual(k.getAddress(False), '1BVn1pqN6njq9zvqus9PPeDtbdJKc2bi9m')
+      self.assertEqual(k.getPubKey(False), '0468b105d83122aabfcf3c64f20d4b6a4ef280b1aaea82a843ba6c6d7961885427c200026b6bedda94ca37c36c5f485fd814c723b30c8061457bbeb279c884c603')
+
       k = keyNodeBIP44Account1.getChild(1).getChild(1)
       # "44'/0'/1'/1/1
-      self.assertEquals(k.getPrivKey(True), 'L5jS5VLsGGYg2XnkUBS4x9qfpeeASx6ZpAFy8Uh39ggc2SEaneop')
-      self.assertEquals(k.getAddress(True), '155P6c59ixhpQyfn7a9mZbH9qsNaVE4Shv')
+      self.assertEqual(k.getPrivKey(True), 'L5jS5VLsGGYg2XnkUBS4x9qfpeeASx6ZpAFy8Uh39ggc2SEaneop')
+      self.assertEqual(k.getAddress(True), '155P6c59ixhpQyfn7a9mZbH9qsNaVE4Shv')
+      self.assertEqual(k.getPubKey(True), '02a59b9a6e1d0552c16efc958dadeb30cd783c4fa5d79a1364e3db6c7b44533fce')
+      self.assertEqual(k.getPrivKey(False), '5Kk9QDmNoxddUzGoYzC7naGZMmKqp7bLfn9NnCFxmZZ5mHG4HY9')
+      self.assertEqual(k.getAddress(False), '1Dx2QUVVMbjx55AtamXweRXSEadxRipXuJ')
+      self.assertEqual(k.getPubKey(False), '04a59b9a6e1d0552c16efc958dadeb30cd783c4fa5d79a1364e3db6c7b44533fce0eaaf3f2414b931409758c6b1f5a62e7f2ce48aa1b5340ac9467e5de8261130c')
 
     def testBIP39AndBIP44_2(self):
       mnemonic = 'payment minute try rifle weekend spin sentence slush iron fury artist slogan'
       seedHexStr = '3a73c9afd0c9c585d5d1197252ea64030d099c931ebc388b85ba61d95c42503c51e42d3161e0e7fe9933b4dc8866ac390f70e296661462b2deb27f59cb87389c'
-      self.assertEquals(BIP39.phraseIsValid(mnemonic), True)
-      self.assertEquals(binascii.hexlify(BIP39.getMasterHex(mnemonic)), seedHexStr)
+      self.assertEqual(BIP39.phraseIsValid(mnemonic), True)
+      self.assertEqual(safe_hexlify(BIP39.getMasterHex(mnemonic)), seedHexStr)
 
       master_secret, master_chain, master_public_key, master_public_key_compressed = bip32_init(seedHexStr)
       k = master_secret
@@ -3388,50 +3533,175 @@ class TestKeyTree(unittest.TestCase):
       # "44'/0'/0'
       keyNodeBIP44Account0 = keyNode.getChild(KeyTreeUtil.toPrime(44)).getChild(KeyTreeUtil.toPrime(0)).getChild(KeyTreeUtil.toPrime(0))
       keyNodePubkeyNodeBIP44Account0 = keyNodeBIP44Account0.getPublic()
-      self.assertEquals(keyNodePubkeyNodeBIP44Account0.getExtKey(), 'xpub6CKJAMrz4m23L1tHakEGy4X9dr9Re39YES4XunwZkZn78HCpcXj9kYWfYaeAtA7H1rrmebffgg6fAPR1GJbHJqVnUS7pmBkwoMB7uW3Ftju')
-      self.assertEquals(keyNodeBIP44Account0.getExtKey(), 'xprv9yKwkrL6EPTk7XopUihGbvaR5pJwEaRgsD8w7QXxCEF8FUsg4zQuCkCBhKxA8zrXMQ2rqSEcmDEc5DcPKYz4Jbbk1ryX4eSWfpgYRZqWW3b')
+      self.assertEqual(keyNodePubkeyNodeBIP44Account0.getExtKey(), 'xpub6CKJAMrz4m23L1tHakEGy4X9dr9Re39YES4XunwZkZn78HCpcXj9kYWfYaeAtA7H1rrmebffgg6fAPR1GJbHJqVnUS7pmBkwoMB7uW3Ftju')
+      self.assertEqual(keyNodeBIP44Account0.getExtKey(), 'xprv9yKwkrL6EPTk7XopUihGbvaR5pJwEaRgsD8w7QXxCEF8FUsg4zQuCkCBhKxA8zrXMQ2rqSEcmDEc5DcPKYz4Jbbk1ryX4eSWfpgYRZqWW3b')
 
       k = keyNodeBIP44Account0.getChild(0).getChild(0)
       # "44'/0'/0'/0/0
-      self.assertEquals(k.getPrivKey(True), 'L2485SWvCq24gLnkaWhJB7hgKhCuWKNrFUPoZYivrhtPHDLVucwc')
-      self.assertEquals(k.getAddress(True), '1FaRiujjaQSC6585ixvRepBionjyzM6drN')
+      self.assertEqual(k.getPrivKey(True), 'L2485SWvCq24gLnkaWhJB7hgKhCuWKNrFUPoZYivrhtPHDLVucwc')
+      self.assertEqual(k.getAddress(True), '1FaRiujjaQSC6585ixvRepBionjyzM6drN')
+      self.assertEqual(k.getPubKey(True), '02c309b6898ed9b9156ff9847dfd3ea3753a1bce18ea3d8f916473ad1f5c9aa637')
+      self.assertEqual(k.getPrivKey(False), '5JupNPzyuyeQ37kSjV2RjcxSDqz5CB48zCeLcU8EZZNcQfGvhb1')
+      self.assertEqual(k.getAddress(False), '1GfPr7Wvpay8ihWZ52WS5ibNnkivnJJQSy')
+      self.assertEqual(k.getPubKey(False), '04c309b6898ed9b9156ff9847dfd3ea3753a1bce18ea3d8f916473ad1f5c9aa637754d0f09e44155e21a0d0310aa16f3b3f611af4ad3fb3436693c68f74a976396')
       k = keyNodeBIP44Account0.getChild(0).getChild(1)
       # "44'/0'/0'/0/1
-      self.assertEquals(k.getPrivKey(True), 'L2wXUmKTwKsQM5DiproJpwgzhnN7p5FCzd6XoteXAb1ky1bi7LeG')
-      self.assertEquals(k.getAddress(True), '1NR4SxQioSepwBS6N6pdJ18uBT4H9Yxct')
+      self.assertEqual(k.getPrivKey(True), 'L2wXUmKTwKsQM5DiproJpwgzhnN7p5FCzd6XoteXAb1ky1bi7LeG')
+      self.assertEqual(k.getAddress(True), '1NR4SxQioSepwBS6N6pdJ18uBT4H9Yxct')
+      self.assertEqual(k.getPubKey(True), '033feacb414cabac1e4a69951d30deeea1201ff72151b26b362dda63c2ee9fb57a')
+      self.assertEqual(k.getPrivKey(False), '5K7TqtGxwuJmFyEkuz3nj8QZZMFJQMSskR3AFFRMt7M7LWA2Lx5')
+      self.assertEqual(k.getAddress(False), '16ahGxDzFYnK7RG4PmvjMWCEBj8DHHz2i')
+      self.assertEqual(k.getPubKey(False), '043feacb414cabac1e4a69951d30deeea1201ff72151b26b362dda63c2ee9fb57a70174cdfc3c04914eae40a8a3c4b439faa81571bd570fa25e4eebcab9930edd7')
 
       k = keyNodeBIP44Account0.getChild(1).getChild(0)
       # "44'/0'/0'/1/0
-      self.assertEquals(k.getPrivKey(True), 'L3grZRytSJxVberN8Z5yNocvq4vEgX1ng2oZm1SG6MSJD25F72ZA')
-      self.assertEquals(k.getAddress(True), '1HhCwuYhxtG8Ums95ZTuYciayJbDNy9ofQ')
+      self.assertEqual(k.getPrivKey(True), 'L3grZRytSJxVberN8Z5yNocvq4vEgX1ng2oZm1SG6MSJD25F72ZA')
+      self.assertEqual(k.getAddress(True), '1HhCwuYhxtG8Ums95ZTuYciayJbDNy9ofQ')
+      self.assertEqual(k.getPubKey(True), '0237723b2125bf63afded5184ddeddabb728912f02cc2e2ff2a4e0c128f6aee212')
+      self.assertEqual(k.getPrivKey(False), '5KHHDLFheuZ4JpYaLPDueZmPcp7Au11BMAvbcM36gjEtUgDoRGF')
+      self.assertEqual(k.getAddress(False), '126sEodKKqTxBGRz7H7ZDtoKYwTJZ2cGJH')
+      self.assertEqual(k.getPubKey(False), '0437723b2125bf63afded5184ddeddabb728912f02cc2e2ff2a4e0c128f6aee21255b11b1045d7bff24bcdc0d648ca9109d06bc39e676f3ed761877c333fa958be')
       k = keyNodeBIP44Account0.getChild(1).getChild(1)
       # "44'/0'/0'/1/1
-      self.assertEquals(k.getPrivKey(True), 'KwraHz3vtY22aaGP1jfpoY7xk1fHRHsURLLUcitzDNs7dz321e1p')
-      self.assertEquals(k.getAddress(True), '1AXvaXfeUyrod7xfxjQzDfKTipfeNdktg8')
+      self.assertEqual(k.getPrivKey(True), 'KwraHz3vtY22aaGP1jfpoY7xk1fHRHsURLLUcitzDNs7dz321e1p')
+      self.assertEqual(k.getAddress(True), '1AXvaXfeUyrod7xfxjQzDfKTipfeNdktg8')
+      self.assertEqual(k.getPubKey(True), '031aeabce44a716a55d46a79a5d3a1d2353389f1230dc5e5a24595dcc98b884e58')
+      self.assertEqual(k.getPrivKey(False), '5HxdzmeNGkjNey2Dh3RCjiVK4rYL8KKgk86mmoCKrUcNShEu7Yn')
+      self.assertEqual(k.getAddress(False), '1LWvFbks5Z7d4neXJe5z4MNffAgn6vWK5f')
+      self.assertEqual(k.getPubKey(False), '041aeabce44a716a55d46a79a5d3a1d2353389f1230dc5e5a24595dcc98b884e58652d187da697210f43512e94afd15f93cc34d8cd796c6eeeef9c7435300c0a89')
 
       # "44'/0'/1'
       keyNodeBIP44Account1 = keyNode.getChild(KeyTreeUtil.toPrime(44)).getChild(KeyTreeUtil.toPrime(0)).getChild(KeyTreeUtil.toPrime(1))
       keyNodePubkeyNodeBIP44Account1 = keyNodeBIP44Account1.getPublic()
-      self.assertEquals(keyNodePubkeyNodeBIP44Account1.getExtKey(), 'xpub6CKJAMrz4m23Q36BMYQmR5eWaG19Gc41knevzToxToqpc5j5owUXiEBg1DG8pdiQ7vvq5prrB7HPLTzS7CtV7rzexSZ33sWmXnRD6yMB9G1')
-      self.assertEquals(keyNodeBIP44Account1.getExtKey(), 'xprv9yKwkrL6EPTkBZ1iFWsm3whn2EAes9LAPZjLC5QLuUJqjHPwGQAHARsC9xFXi9H96w5x7fSNn1GWD7xEo1Mam5PY87yzPNP5KMPQMhuR3ip')
+      self.assertEqual(keyNodePubkeyNodeBIP44Account1.getExtKey(), 'xpub6CKJAMrz4m23Q36BMYQmR5eWaG19Gc41knevzToxToqpc5j5owUXiEBg1DG8pdiQ7vvq5prrB7HPLTzS7CtV7rzexSZ33sWmXnRD6yMB9G1')
+      self.assertEqual(keyNodeBIP44Account1.getExtKey(), 'xprv9yKwkrL6EPTkBZ1iFWsm3whn2EAes9LAPZjLC5QLuUJqjHPwGQAHARsC9xFXi9H96w5x7fSNn1GWD7xEo1Mam5PY87yzPNP5KMPQMhuR3ip')
 
       k = keyNodeBIP44Account1.getChild(0).getChild(0)
       # "44'/0'/1'/0/0
-      self.assertEquals(k.getPrivKey(True), 'L4RidpdkZSbVRnjtCRtXZdnpQe6GwG2GDB6315tMbAmfkdo4DZsD')
-      self.assertEquals(k.getAddress(True), '1LEtY7Vqfg6QEvNnQrrbYLpLQjFmqt84XD')
+      self.assertEqual(k.getPrivKey(True), 'L4RidpdkZSbVRnjtCRtXZdnpQe6GwG2GDB6315tMbAmfkdo4DZsD')
+      self.assertEqual(k.getAddress(True), '1LEtY7Vqfg6QEvNnQrrbYLpLQjFmqt84XD')
+      self.assertEqual(k.getPubKey(True), '020ed67f822cf5b08a1b46737ef4a572874b36f87aa0f29c851be3c846eb69b1fe')
+      self.assertEqual(k.getPrivKey(False), '5KSzTvPNei9GWBN3Y8uTQhxhCFJ4A82eRxkjbTUwxmopkVKM74q')
+      self.assertEqual(k.getAddress(False), '1FFV5TjKKixJN3bu4MiGnxBWr9voF3TZ3X')
+      self.assertEqual(k.getPubKey(False), '040ed67f822cf5b08a1b46737ef4a572874b36f87aa0f29c851be3c846eb69b1fec705b286fd4b88a933b682061f0e01179b31e140a0f57bdb5bc128f7100ff046')
       k = keyNodeBIP44Account1.getChild(0).getChild(1)
       # "44'/0'/1'/0/1
-      self.assertEquals(k.getPrivKey(True), 'KyTWJGcG6BgsUsR3LE5SEEqCo3ZD7sh5sgLSFe5vyXkbraJcwmZy')
-      self.assertEquals(k.getAddress(True), '14rNR9AWgiHCDtjUYUWn1JwEWSxtTeiaui')
+      self.assertEqual(k.getPrivKey(True), 'KyTWJGcG6BgsUsR3LE5SEEqCo3ZD7sh5sgLSFe5vyXkbraJcwmZy')
+      self.assertEqual(k.getAddress(True), '14rNR9AWgiHCDtjUYUWn1JwEWSxtTeiaui')
+      self.assertEqual(k.getPubKey(True), '024b6cb1ea39a0283dcabe7206b6d56a414014ad18d12411466a4fb630244d7483')
+      self.assertEqual(k.getPrivKey(False), '5JKhAoapNZnHRSUCQPSvkKzbPfeCosTJRApT7VLhKhVuksTd22L')
+      self.assertEqual(k.getAddress(False), '19ZPEMom1UE1t2cYQzsDzgVK6KLpg6zdQP')
+      self.assertEqual(k.getPubKey(False), '044b6cb1ea39a0283dcabe7206b6d56a414014ad18d12411466a4fb630244d7483b072ce80ef43780badc5fe5cdbb13644afe6327eaf45971bf0c5e55ab34b720e')
 
       k = keyNodeBIP44Account1.getChild(1).getChild(0)
       # "44'/0'/1'/1/0
-      self.assertEquals(k.getPrivKey(True), 'L2dfzRoFiQK2VgaGyYWnuFz82CqTdzJXEmMRsBMxh7eZsMV4iC4J')
-      self.assertEquals(k.getAddress(True), '1D28BJPdrdhRzYzPHsdktDPKSP5ZKX54df')
+      self.assertEqual(k.getPrivKey(True), 'L2dfzRoFiQK2VgaGyYWnuFz82CqTdzJXEmMRsBMxh7eZsMV4iC4J')
+      self.assertEqual(k.getAddress(True), '1D28BJPdrdhRzYzPHsdktDPKSP5ZKX54df')
+      self.assertEqual(k.getPubKey(True), '029e878cf81b3a0a24c3f2af8b0c50b01b86da656305e93ff1f52d62b69716b458')
+      self.assertEqual(k.getPrivKey(False), '5K3REvCPNAMrH1oxjGJAwtRivHjFC6jV9ZFbdk8U7pj3TpfVZkj')
+      self.assertEqual(k.getAddress(False), '18YHWphSmjj1FTPuz3sbqZGNTfzPCrotye')
+      self.assertEqual(k.getPubKey(False), '049e878cf81b3a0a24c3f2af8b0c50b01b86da656305e93ff1f52d62b69716b4588a3cb05ce968b26d6af16fefda76e2fb84b75a5d9475f1ebe9ecea8ff320e3fa')
       k = keyNodeBIP44Account1.getChild(1).getChild(1)
       # "44'/0'/1'/1/1
-      self.assertEquals(k.getPrivKey(True), 'L54L4MYkj4sBMzW5Zs44EMEtiRk51ng7PB2p69B8ZBynonu6EsxX')
-      self.assertEquals(k.getAddress(True), '1Hko6Wt7D2NL6djdjGz7vxgXwhTEMWaQKQ')
+      self.assertEqual(k.getPrivKey(True), 'L54L4MYkj4sBMzW5Zs44EMEtiRk51ng7PB2p69B8ZBynonu6EsxX')
+      self.assertEqual(k.getAddress(True), '1Hko6Wt7D2NL6djdjGz7vxgXwhTEMWaQKQ')
+      self.assertEqual(k.getPubKey(True), '033529ad53c5ece0b87a237299ad4541bf9dc8e31171495b5f9f70c28e4dc88412')
+      self.assertEqual(k.getPrivKey(False), '5KbHZ2V3CoBv6fQMX6uMDYKZ7DQMPqQpDGsFkJiGJiTTh51Kx6R')
+      self.assertEqual(k.getAddress(False), '133XTyugjyV8NLzvkfRRLri6uLFz4acBCs')
+      self.assertEqual(k.getPubKey(False), '043529ad53c5ece0b87a237299ad4541bf9dc8e31171495b5f9f70c28e4dc88412f5d124ed7b3b0ad23a2d1d2d8251f6504dc833a3f55fbb3ac7628d0cf658dbc1')
+
+    def testGenerateMnemonic(self):
+      mnemonic = BIP39.generateMnemonicPassphrase()
+      self.assertEqual(BIP39.phraseIsValid(mnemonic), True)
+      self.assertEqual(len(mnemonic.split()), 12)
+
+    def testExtendedKeyPrimeDerivation(self):
+      extKey = 'xprv9uHRZZhk6KAJC1avXpDAp4MDc3sQKNxDiPvvkX8Br5ngLNv1TxvUxt4cV1rGL5hj6KCesnDYUhd7oWgT11eZG7XnxHrnYeSvkzY7d2bhkJ7'
+      extKeyBytes = DecodeBase58Check(extKey)
+      keyNode = KeyNode(extkey = extKeyBytes)
+      self.assertEqual(keyNode.getPublic().getExtKey(), 'xpub68Gmy5EdvgibQVfPdqkBBCHxA5htiqg55crXYuXoQRKfDBFA1WEjWgP6LHhwBZeNK1VTsfTFUHCdrfp1bgwQ9xv5ski8PX9rL2dZXvgGDnw')
+
+      keyNode = keyNode.getChild(KeyTreeUtil.toPrime(0)).getChild(8)
+      keyNodePublic = keyNode.getPublic()
+      self.assertEqual(keyNodePublic.getExtKey(), 'xpub6DQgP643Y39n9c1tbmwb6opi5ndTBYFK8K7UbFt8XfYcrM4aBZFL8KXBEfFg5ngnUrUd9T5ZouvoWuVgU8KguhTjzm9VnUx8x4tySSCSUXf')
+      self.assertEqual(keyNode.getExtKey(), 'xprv9zRKyaX9hfbUw7wRVkQajfsyXknxn5XTm6BsnsUWyL1dyYjRe1w5aXChPP2JXdbUU7DMgy2KC8w9MBjz78GjxGxTa7MCnPHAgFQaYLv2oay')
+      self.assertEqual(keyNode.getPrivKey(True), 'L5UUipv5Fp94yK3xLqqfNKhXA1BZPt64JBw4jhnvqax36AsqHA3W')
+      self.assertEqual(keyNode.getAddress(True), '14hDwAhNkhCprB9Xbk1drgZiamitcHRkQD')
+      self.assertEqual(keyNode.getPubKey(True), '0394580846dd10ad927b46eeecdb691073d560fbfeca28b3df87d1af41435e8ac1')
+      self.assertEqual(keyNode.getPrivKey(False), '5Kgktcn6x1iFVcotWRCw1JNsLFzg4NYWJ32Nh2zXmzY3jumJ6CD')
+      self.assertEqual(keyNode.getAddress(False), '167eGArJCtpd1vxBTwzucW33oSNGyUYq5S')
+      self.assertEqual(keyNode.getPubKey(False), '0494580846dd10ad927b46eeecdb691073d560fbfeca28b3df87d1af41435e8ac1e989476e1fd426c56e1a0284a1c8430a597233669ae614a4335becd0ff9b0c49')
+
+      self.assertEqual(keyNodePublic.getAddress(True), '14hDwAhNkhCprB9Xbk1drgZiamitcHRkQD')
+      self.assertEqual(keyNodePublic.getPubKey(True), '0394580846dd10ad927b46eeecdb691073d560fbfeca28b3df87d1af41435e8ac1')
+      self.assertEqual(keyNodePublic.getAddress(False), '167eGArJCtpd1vxBTwzucW33oSNGyUYq5S')
+      self.assertEqual(keyNodePublic.getPubKey(False), '0494580846dd10ad927b46eeecdb691073d560fbfeca28b3df87d1af41435e8ac1e989476e1fd426c56e1a0284a1c8430a597233669ae614a4335becd0ff9b0c49')
+
+      self.assertEqual(is_valid(keyNode.getAddress(True)), True)
+      self.assertEqual(is_valid(keyNode.getAddress(False)), True)
+
+      extKey = 'xpub6DQgP643Y39n9c1tbmwb6opi5ndTBYFK8K7UbFt8XfYcrM4aBZFL8KXBEfFg5ngnUrUd9T5ZouvoWuVgU8KguhTjzm9VnUx8x4tySSCSUXf'
+      extKeyBytes = DecodeBase58Check(extKey)
+      keyNodePublic = KeyNode(extkey = extKeyBytes)
+
+      self.assertEqual(keyNodePublic.getAddress(True), '14hDwAhNkhCprB9Xbk1drgZiamitcHRkQD')
+      self.assertEqual(keyNodePublic.getPubKey(True), '0394580846dd10ad927b46eeecdb691073d560fbfeca28b3df87d1af41435e8ac1')
+      self.assertEqual(keyNodePublic.getAddress(False), '167eGArJCtpd1vxBTwzucW33oSNGyUYq5S')
+      self.assertEqual(keyNodePublic.getPubKey(False), '0494580846dd10ad927b46eeecdb691073d560fbfeca28b3df87d1af41435e8ac1e989476e1fd426c56e1a0284a1c8430a597233669ae614a4335becd0ff9b0c49')
+
+      self.assertEqual(is_valid(keyNodePublic.getAddress(True)), True)
+      self.assertEqual(is_valid(keyNodePublic.getAddress(False)), True)
+
+    def testExtendedKeyNonPrimeDerivation(self):
+      extKey = 'xprv9uHRZZhk6KAJC1avXpDAp4MDc3sQKNxDiPvvkX8Br5ngLNv1TxvUxt4cV1rGL5hj6KCesnDYUhd7oWgT11eZG7XnxHrnYeSvkzY7d2bhkJ7'
+      extKeyBytes = DecodeBase58Check(extKey)
+      keyNode = KeyNode(extkey = extKeyBytes)
+
+      keyNode = keyNode.getChild(0).getChild(8)
+      keyNodePublic = keyNode.getPublic()
+      self.assertEqual(keyNodePublic.getExtKey(), 'xpub6DEF9h3BTTA8Ka3SSg9aek42rcAKSsXbpczRPzKiFTjCfJg3oeqy6VcUoYLxsEqggRFpXF97XN1pqVYu5FwKJKu2Xsw2PXnDrk8h7cr8rEi')
+      self.assertEqual(keyNode.getExtKey(), 'xprv9zEtkBWHd5bq75xyLecaHc7JJaKq3QokTQ4pbbv6h8CDnWLuG7XiYhHzxFdTUsvYaZBEtAXNeB4Rdm1Unk3nbtbzxF8h6sy6ZJnazdeX7ep')
+      self.assertEqual(keyNode.getPrivKey(True), 'L1Zku8j3mCiiHxZdo6NDLHv6jcA1JyNufUSHBMiznML38vNr9Agh')
+      self.assertEqual(keyNode.getAddress(True), '17JbSP83rPWmbdcdtiiTNqBE8MgGN8kmUk')
+      self.assertEqual(keyNode.getPubKey(True), '035f980e89a2c5d5805e44ac5c55441be195deba5aa46910f66be3d6e0b6c7c3c1')
+      self.assertEqual(keyNode.getPrivKey(False), '5JoPdjXpkYezqhgZohBhQQKNh1iTofbsSwFLXSYGMhQLyDJ3beh')
+      self.assertEqual(keyNode.getAddress(False), '1LdwPM9Qpt5ucZck9SGjwkZh1VzTfrYVrC')
+      self.assertEqual(keyNode.getPubKey(False), '045f980e89a2c5d5805e44ac5c55441be195deba5aa46910f66be3d6e0b6c7c3c1ae9d3053c9a526cd97dd5e4c2483992963a061b6271f89482b5e30da450234e1')
+
+      self.assertEqual(is_valid(keyNode.getAddress(True)), True)
+      self.assertEqual(is_valid(keyNode.getAddress(False)), True)
+
+      self.assertEqual(keyNodePublic.getAddress(True), '17JbSP83rPWmbdcdtiiTNqBE8MgGN8kmUk')
+      self.assertEqual(keyNodePublic.getPubKey(True), '035f980e89a2c5d5805e44ac5c55441be195deba5aa46910f66be3d6e0b6c7c3c1')
+      self.assertEqual(keyNodePublic.getAddress(False), '1LdwPM9Qpt5ucZck9SGjwkZh1VzTfrYVrC')
+      self.assertEqual(keyNodePublic.getPubKey(False), '045f980e89a2c5d5805e44ac5c55441be195deba5aa46910f66be3d6e0b6c7c3c1ae9d3053c9a526cd97dd5e4c2483992963a061b6271f89482b5e30da450234e1')
+
+
+      extKey = 'xpub68Gmy5EdvgibQVfPdqkBBCHxA5htiqg55crXYuXoQRKfDBFA1WEjWgP6LHhwBZeNK1VTsfTFUHCdrfp1bgwQ9xv5ski8PX9rL2dZXvgGDnw'
+      extKeyBytes = DecodeBase58Check(extKey)
+      keyNode = KeyNode(extkey = extKeyBytes)
+
+      keyNodePublic = keyNode.getChild(0).getChild(8)
+      self.assertEqual(keyNodePublic.getExtKey(), 'xpub6DEF9h3BTTA8Ka3SSg9aek42rcAKSsXbpczRPzKiFTjCfJg3oeqy6VcUoYLxsEqggRFpXF97XN1pqVYu5FwKJKu2Xsw2PXnDrk8h7cr8rEi')
+
+      self.assertEqual(keyNodePublic.getAddress(True), '17JbSP83rPWmbdcdtiiTNqBE8MgGN8kmUk')
+      self.assertEqual(keyNodePublic.getPubKey(True), '035f980e89a2c5d5805e44ac5c55441be195deba5aa46910f66be3d6e0b6c7c3c1')
+      self.assertEqual(keyNodePublic.getAddress(False), '1LdwPM9Qpt5ucZck9SGjwkZh1VzTfrYVrC')
+      self.assertEqual(keyNodePublic.getPubKey(False), '045f980e89a2c5d5805e44ac5c55441be195deba5aa46910f66be3d6e0b6c7c3c1ae9d3053c9a526cd97dd5e4c2483992963a061b6271f89482b5e30da450234e1')
+
+
+      self.assertEqual(is_valid(keyNodePublic.getAddress(True)), True)
+      self.assertEqual(is_valid(keyNodePublic.getAddress(False)), True)
+
+    def testIsValidAddress(self):
+      self.assertEqual(is_valid('14hDwAhNkhCprB9Xbk1drgZiamitcHRkQD'), True)
+      self.assertEqual(is_valid('167eGArJCtpd1vxBTwzucW33oSNGyUYq5S'), True)
+      self.assertEqual(is_valid('17JbSP83rPWmbdcdtiiTNqBE8MgGN8kmUk'), True)
+      self.assertEqual(is_valid('1LdwPM9Qpt5ucZck9SGjwkZh1VzTfrYVrC'), True)
+      self.assertEqual(is_valid('123'), False)
+      self.assertEqual(is_valid('1LdwPM9Qpt5ucZck9SGjwkZh1VzTfrYVr'), False)
+      self.assertEqual(is_valid('LdwPM9Qpt5ucZck9SGjwkZh1VzTfrYVrC'), False)
+      self.assertEqual(is_valid('LdwPM9Qpt5ucZck9SGjwkZh1VzTfrYVr'), False)
 
 def suite():
   suite = unittest.TestSuite()
@@ -3439,6 +3709,11 @@ def suite():
   suite.addTest(TestKeyTree('testVector2'))
   suite.addTest(TestKeyTree('testBIP39AndBIP44_1'))
   suite.addTest(TestKeyTree('testBIP39AndBIP44_2'))
+  suite.addTest(TestKeyTree('testGenerateMnemonic'))
+  suite.addTest(TestKeyTree('testExtendedKeyPrimeDerivation'))
+  suite.addTest(TestKeyTree('testExtendedKeyNonPrimeDerivation'))
+  suite.addTest(TestKeyTree('testExtendedKeyNonPrimeDerivation'))
+  suite.addTest(TestKeyTree('testIsValidAddress'))
   return suite
 
 def parse_arguments(argv):
@@ -3741,7 +4016,7 @@ def handle_arguments(argsDict):
     return 0
 
 def outputString(string):
-    print string
+    print(string)
 
 def visit(keyNode, chainName, isLeafNode, optionsDict):
     if not isLeafNode and not optionsDict.get(OUTPUT_ENTIRE_CHAIN_OPTION):
@@ -3843,8 +4118,8 @@ def traverseLevelorder(keyNode, treeChains, chainName, level, keyNodeDeq, levelN
 def outputExtraKeyNodeData(keyNode):
     outputString("  * depth:              " + str(keyNode.getDepth()))
     outputString("  * child number:       " + KeyTreeUtil.iToString(keyNode.getChildNum()))
-    outputString("  * parent fingerprint: " + keyNode.getParentFingerPrint().encode('hex'))
-    outputString("  * fingerprint:        " + keyNode.getFingerPrint().encode('hex'))
+    outputString("  * parent fingerprint: " + bytes_to_hex_string(keyNode.getParentFingerPrint()))
+    outputString("  * fingerprint:        " + bytes_to_hex_string(keyNode.getFingerPrint()))
 
 def outputExtKeysFromSeed(seed, chainStr, seedStringFormat, roundsToHash, optionsDict, traverseType = DEFAULTTREETRAVERSALTYPE):
     seedHexStr = None
@@ -3853,7 +4128,7 @@ def outputExtKeysFromSeed(seed, chainStr, seedStringFormat, roundsToHash, option
         # if doing bip39 then rounds to hash option will not be used because it is not part of the bip39 standard
         if seedStringFormat == StringType.ASCII:
             masterSeed = BIP39.getMasterHex(seed)
-            seedHexStr = binascii.hexlify(masterSeed)
+            seedHexStr = safe_hexlify(masterSeed)
         elif seedStringFormat == StringType.HEX:
             try: int(seed, 16)
             except ValueError: raise ValueError("Invalid hex string \"" + seed + "\"")
@@ -3862,7 +4137,7 @@ def outputExtKeysFromSeed(seed, chainStr, seedStringFormat, roundsToHash, option
             raise ValueError("Invalid seed string format.")
     else:
         if seedStringFormat == StringType.ASCII:
-            seedHexStr = binascii.hexlify(seed)
+            seedHexStr = safe_hexlify(from_string_to_bytes(seed))
         elif seedStringFormat == StringType.HEX:
             try: int(seed, 16)
             except ValueError: raise ValueError("Invalid hex string \"" + seed + "\"")
@@ -3871,7 +4146,7 @@ def outputExtKeysFromSeed(seed, chainStr, seedStringFormat, roundsToHash, option
             raise ValueError("Invalid seed string format.")
 
         if roundsToHash > 0:
-            seedHexStr = KeyTreeUtil.sha256Rounds(safe_from_hex(seedHexStr) , roundsToHash).encode('hex')
+            seedHexStr = bytes_to_hex_string(KeyTreeUtil.sha256Rounds(safe_from_hex(seedHexStr) , roundsToHash))
 
 
     if optionsDict.get(TESTNET) == None or optionsDict.get(TESTNET) == False:
@@ -3948,7 +4223,7 @@ def outputGeneratedMnemonicPassphrase(optionsDict):
     outputString(mnemonic)
     if optionsDict.get(VERBOSE_OPTION):
         outputString("Master (hex):")
-        outputString(binascii.hexlify(BIP39.getMasterHex(mnemonic)))
+        outputString(safe_hexlify(BIP39.getMasterHex(mnemonic)))
 
 def main():
     argv = sys.argv[1:]
