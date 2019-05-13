@@ -2062,21 +2062,6 @@ if sys.version_info.major == 2:
       256: ''.join([chr(x) for x in range(256)])
   }
 
-  def bin_dbl_sha256(s):
-      bytes_to_hash = from_string_to_bytes(s)
-      return hashlib.sha256(hashlib.sha256(bytes_to_hash).digest()).digest()
-
-  def get_code_string(base):
-      if base in code_strings:
-          return code_strings[base]
-      else:
-          raise ValueError("Invalid base!")
-
-  def changebase(string, frm, to, minlen=0):
-      if frm == to:
-          return lpad(string, get_code_string(frm)[0], minlen)
-      return encode(decode(string, frm), to, minlen)
-
   def bin_to_b58check(inp, magicbyte=0):
       while magicbyte > 0:
           inp = chr(int(magicbyte % 256)) + inp
@@ -2133,21 +2118,6 @@ else:
       58: '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz',
       256: ''.join([chr(x) for x in range(256)])
   }
-
-  def bin_dbl_sha256(s):
-      bytes_to_hash = from_string_to_bytes(s)
-      return hashlib.sha256(hashlib.sha256(bytes_to_hash).digest()).digest()
-
-  def get_code_string(base):
-      if base in code_strings:
-          return code_strings[base]
-      else:
-          raise ValueError("Invalid base!")
-
-  def changebase(string, frm, to, minlen=0):
-      if frm == to:
-          return lpad(string, get_code_string(frm)[0], minlen)
-      return encode(decode(string, frm), to, minlen)
 
   def bin_to_b58check(inp, magicbyte=0):
       while magicbyte > 0:
@@ -2226,6 +2196,28 @@ else:
           string = string[1:]
 
       return result
+
+
+def bin_dbl_sha256(s):
+    bytes_to_hash = from_string_to_bytes(s)
+    return hashlib.sha256(hashlib.sha256(bytes_to_hash).digest()).digest()
+
+def lpad(msg, symbol, length):
+        if len(msg) >= length:
+            return msg
+        return symbol * (length - len(msg)) + msg
+
+def get_code_string(base):
+    if base in code_strings:
+        return code_strings[base]
+    else:
+        raise ValueError("Invalid base!")
+
+def changebase(string, frm, to, minlen=0):
+    if frm == to:
+        return lpad(string, get_code_string(frm)[0], minlen)
+    return encode(decode(string, frm), to, minlen)
+
 
 def b58check_to_bin(inp):
     leadingzbytes = len(re.match('^1*', inp).group(0))
